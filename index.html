@@ -458,6 +458,11 @@ async function confirmStudentName() {
       correctCount = data.correctCount;
       if (data.wrongList && data.wrongList !== "無 (全對)") wrongQuestions = data.wrongList.split("; ");
       if (data.arena && data.arena.length > 0) arena = data.arena;
+      
+      // 【關鍵升級】：從雲端還原每道題過去答對的次數！
+      if (data.qMastery) {
+        qMasteryStats = data.qMastery;
+      }
     }
     document.getElementById("display-name").innerText = userName;
     updateScoreUI();
@@ -652,6 +657,23 @@ function processAnswerResult(isRight, correctAnswerText) {
 
   nextBtn.style.display = "block";
   autoSaveToCloud();
+}
+
+function autoSaveToCloud() {
+  const wrongText = wrongQuestions.length > 0 ? wrongQuestions.join("; ") : "無 (全對)";
+  fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "saveScore",
+      email: userEmail,
+      name: userName,
+      score: totalScore,
+      correctCount: correctCount,
+      wrongList: wrongText,
+      arena: arena,
+      qMastery: qMasteryStats // 【關鍵升級】：將最新每題作答進度同步至試算表！
+    })
+  }).then(() => updateSideLeaderboard());
 }
 
 function handleAfterAnswer() {
