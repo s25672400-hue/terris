@@ -2,99 +2,123 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>俄羅斯方塊學習 - 暫存方塊與防誤觸版</title>
+  <!-- PWA 與全螢幕 APP 標籤：讓手機自動支援全螢幕無網址列運行 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#121212">
+  <title>俄羅斯方塊學習 APP</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     * { box-sizing: border-box; touch-action: manipulation; -webkit-touch-callout: none; }
-    body {
-      margin: 0; padding: 10px; font-family: sans-serif;
-      background: #1a1a1a; color: #fff; text-align: center;
-      display: flex; flex-direction: column; align-items: center;
+    
+    /* 核心 APP 佈局：充滿整個螢幕 (100dvh)，不產生任何額外捲動條 */
+    html, body {
+      width: 100%; height: 100%; height: 100dvh;
+      margin: 0; padding: 0; background: #121212; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden; display: flex; flex-direction: column;
+      justify-content: space-between; align-items: center;
     }
-    #score-board { font-size: 1.1rem; margin-bottom: 8px; color: #ffeb3b; }
+
+    /* 頂部資訊列 (固定頂端) */
+    #top-bar {
+      width: 100%; padding: 6px 10px; display: flex;
+      flex-direction: column; align-items: center; z-index: 10;
+    }
+    #score-board { font-size: 1rem; color: #ffeb3b; font-weight: bold; }
     .top-bar-btn {
-      display: none; color: white; border: none; padding: 6px 14px;
-      border-radius: 20px; font-size: 0.85rem; margin: 4px; cursor: pointer; font-weight: bold;
+      display: none; color: white; border: none; padding: 4px 12px;
+      border-radius: 20px; font-size: 0.8rem; margin-top: 3px; cursor: pointer; font-weight: bold;
     }
 
+    /* 中間主要舞台 (自動彈性縮放填滿剩餘高度) */
     #main-stage {
-      display: flex; gap: 10px; justify-content: center;
-      align-items: flex-start; max-width: 100%;
+      flex: 1; width: 100%; display: flex; gap: 8px;
+      justify-content: center; align-items: center; padding: 2px 8px;
+      overflow: hidden;
     }
 
-    /* 左側側邊欄：風雲榜 + 暫存方塊區 */
+    /* 左側側邊欄 (風雲榜 + 暫存方塊) */
     #left-side-col {
-      display: flex; flex-direction: column; gap: 8px; width: 125px;
+      display: flex; flex-direction: column; gap: 6px; width: 110px;
+      height: 100%; max-height: 400px; justify-content: center;
     }
     #side-leaderboard {
-      background: #242424; border: 2px solid #444; border-radius: 8px;
-      padding: 6px 4px; font-size: 0.75rem; text-align: left;
+      background: #222; border: 1.5px solid #444; border-radius: 8px;
+      padding: 5px 4px; font-size: 0.7rem; text-align: left;
     }
     .rank-item {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 4px 0; border-bottom: 1px solid #333;
+      padding: 3px 0; border-bottom: 1px solid #333;
     }
     .rank-item:last-child { border-bottom: none; }
     .rank-name {
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px;
     }
 
-    /* 暫存方塊箱樣式 */
+    /* 暫存方塊箱 */
     #hold-box-container {
-      background: #242424; border: 2px solid #555; border-radius: 8px;
-      padding: 6px; text-align: center;
+      background: #222; border: 1.5px solid #555; border-radius: 8px;
+      padding: 4px; text-align: center;
     }
     #hold-canvas {
-      background: #111; border: 1px solid #444; border-radius: 4px;
-      margin: 4px auto; display: block;
+      background: #000; border: 1px solid #333; border-radius: 4px;
+      margin: 3px auto; display: block;
     }
     .hold-btn {
       background: #0288d1; color: white; border: none; border-radius: 4px;
-      padding: 5px; font-size: 0.75rem; width: 100%; cursor: pointer; font-weight: bold;
+      padding: 4px; font-size: 0.72rem; width: 100%; cursor: pointer; font-weight: bold;
     }
-    .hold-btn:active { background: #01579b; }
 
+    /* 俄羅斯方塊棋盤：自動依螢幕比例縮放大小 */
     #game-container { 
       position: relative; border: 3px solid #555; background: #000;
-      width: 240px; height: 400px; overflow: hidden;
+      height: 100%; max-height: min(48vh, 390px); aspect-ratio: 12 / 20;
+      border-radius: 6px; overflow: hidden; display: flex; justify-content: center;
     }
-    canvas { display: block; }
+    canvas#tetris { width: 100%; height: 100%; object-fit: contain; display: block; }
+    
     #float-score {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      font-size: 1.8rem; font-weight: bold; color: #ffeb3b;
+      font-size: 1.6rem; font-weight: bold; color: #ffeb3b;
       text-shadow: 0 0 10px #ff5722, 0 0 20px #ff9800;
       pointer-events: none; opacity: 0; transition: all 0.8s ease-out; z-index: 50; width: 100%;
     }
     #float-score.show { transform: translate(-50%, -120%); opacity: 1; }
 
-    /* 手機控制按鈕加大 + 間距優化 */
+    /* 底部控制按鈕區：牢牢黏在螢幕最底端！大拇指超舒服 */
     #mobile-controls {
+      width: 100%; max-width: 380px; padding: 6px 14px calc(10px + env(safe-area-inset-bottom));
       display: grid; grid-template-columns: repeat(4, 1fr);
-      gap: 10px; width: 100%; max-width: 340px; margin-top: 12px;
+      gap: 10px; margin-top: auto;
     }
     .ctrl-btn {
-      background: #333; color: white; border: 2px solid #666;
-      border-radius: 10px; padding: 15px 0; font-size: 1.4rem; user-select: none;
+      background: #2c2c2c; color: white; border: 2px solid #555;
+      border-radius: 12px; padding: 16px 0; font-size: 1.5rem; user-select: none;
+      box-shadow: 0 4px #1a1a1a;
     }
-    .ctrl-btn:active { background: #555; }
+    .ctrl-btn:active { background: #444; transform: translateY(2px); box-shadow: 0 2px #111; }
     
-    /* 到底放置按鈕額外往下推開間距，防止誤觸 */
+    /* 到底放置按鈕在最下排 */
     .drop-btn {
       grid-column: span 4; background: #d32f2f; font-weight: bold;
-      font-size: 1.1rem; padding: 14px 0; margin-top: 16px; border-radius: 8px;
+      font-size: 1.15rem; padding: 13px 0; margin-top: 6px; border-radius: 10px;
+      border: 2px solid #b71c1c; box-shadow: 0 4px #7f0000;
     }
-    .drop-btn:active { background: #b71c1c; }
+    .drop-btn:active { background: #b71c1c; transform: translateY(2px); box-shadow: 0 2px #500; }
 
+    /* 彈窗樣式 */
     .modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.85); display: flex;
       justify-content: center; align-items: center; z-index: 100;
     }
     .modal-box {
-      background: #2a2a2a; padding: 20px; border-radius: 12px;
-      width: 95%; max-width: 560px; text-align: left; max-height: 90vh; overflow-y: auto;
+      background: #262626; padding: 20px; border-radius: 12px;
+      width: 92%; max-width: 520px; text-align: left; max-height: 85vh; overflow-y: auto;
     }
     .option-btn {
       width: 100%; margin: 8px 0; padding: 12px; font-size: 1rem;
@@ -106,11 +130,11 @@
       width: 100%; padding: 10px; margin: 6px 0 14px; border-radius: 6px;
       border: 1px solid #777; background: #333; color: white; font-size: 1rem;
     }
-    .q-img { max-width: 100%; max-height: 160px; border-radius: 6px; margin: 8px 0; display: block; }
+    .q-img { max-width: 100%; max-height: 140px; border-radius: 6px; margin: 8px 0; display: block; }
 
     .diff-badge {
-      display: inline-block; padding: 4px 10px; border-radius: 12px;
-      font-size: 0.8rem; font-weight: bold; margin-bottom: 8px;
+      display: inline-block; padding: 3px 8px; border-radius: 10px;
+      font-size: 0.75rem; font-weight: bold; margin-bottom: 6px;
     }
     .diff-1 { background: #2e7d32; color: #fff; }
     .diff-2 { background: #0288d1; color: #fff; }
@@ -118,258 +142,47 @@
     .diff-4 { background: #7b1fa2; color: #fff; }
     .diff-5 { background: #c2185b; color: #fff; }
 
-    .tab-bar { display: flex; border-bottom: 2px solid #444; margin-bottom: 15px; }
+    .tab-bar { display: flex; border-bottom: 2px solid #444; margin-bottom: 12px; }
     .tab-btn {
-      padding: 10px 8px; background: transparent; color: #aaa;
+      padding: 8px 6px; background: transparent; color: #aaa;
       border: none; cursor: pointer; font-size: 0.85rem; font-weight: bold;
     }
     .tab-btn.active { color: #ffeb3b; border-bottom: 3px solid #ffeb3b; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.82rem; }
-    th, td { border: 1px solid #444; padding: 8px; text-align: center; vertical-align: middle; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.8rem; }
+    th, td { border: 1px solid #444; padding: 6px; text-align: center; vertical-align: middle; }
     th { background: #333; color: #ffeb3b; }
     .del-btn {
       background: #d32f2f; color: white; border: none; border-radius: 4px;
-      padding: 4px 8px; font-size: 0.75rem; cursor: pointer;
+      padding: 3px 6px; font-size: 0.75rem; cursor: pointer;
     }
     .save-mini-btn {
       background: #4caf50; color: white; border: none; border-radius: 4px;
-      padding: 4px 8px; font-size: 0.75rem; cursor: pointer;
+      padding: 3px 6px; font-size: 0.75rem; cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-  <!-- 1. Google 帳號登入視窗 -->
-  <div id="login-modal" class="modal">
-    <div class="modal-box" style="text-align:center;">
-      <h3>🎮 答題俄羅斯方塊</h3>
-      <p style="font-size:0.9rem; color:#aaa; margin-bottom:20px;">請使用 Google 帳號登入驗證身分：</p>
-      <div id="g_id_onload" data-auto_prompt="false" data-callback="handleGoogleLogin"></div>
-      <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with"></div>
-      <div id="login-status" style="margin-top:15px; color:#81d4fa; font-size:0.9rem;"></div>
-    </div>
-  </div>
-
-  <!-- 2. 學生自訂姓名確認視窗 -->
-  <div id="name-modal" class="modal" style="display:none;">
-    <div class="modal-box" style="text-align:center;">
-      <h3 style="color:#4caf50;">✅ Google 帳號驗證成功！</h3>
-      <p style="font-size:0.9rem; color:#aaa; text-align:left;">請輸入您的<strong>班級、座號與真實姓名</strong>：</p>
-      <input type="text" id="custom-name-input" class="input-field" placeholder="例如：302 05號 林小美">
-      <button class="option-btn" style="text-align:center; background:#4caf50; font-weight:bold;" onclick="confirmStudentName()">進入挑戰 ➡️</button>
-    </div>
-  </div>
-
-  <!-- 3. 答題視窗 -->
-  <div id="quiz-modal" class="modal" style="display:none;">
-    <div class="modal-box">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; background:#333; padding:6px 10px; border-radius:6px;">
-        <span style="font-size:0.8rem; color:#ffeb3b; font-weight:bold;">🎯 出題難度最低門檻：</span>
-        <select id="user-diff-select" style="background:#222; color:#fff; border:1px solid #666; border-radius:4px; padding:3px 6px; font-size:0.8rem;" onchange="onDifficultyFilterChange()">
-          <option value="1">🌱 簡單以上 (全部)</option>
-          <option value="2">📘 普通以上</option>
-          <option value="3">⚡ 難以上</option>
-          <option value="4">🔥 非常難與地獄</option>
-          <option value="5">☠️ 僅地獄級</option>
-        </select>
-      </div>
-
-      <div id="q-diff-badge" class="diff-badge">難度載入中</div>
-      <span id="q-mastery-hint" style="font-size:0.75rem; color:#aaa; margin-left:8px;"></span>
-
-      <h3 id="q-title" style="margin-top:5px;">題目載入中...</h3>
-      <img id="q-image" class="q-img" style="display:none;" />
-      
-      <div id="options-container"></div>
-      <div id="typing-container" style="display:none;">
-        <input type="text" id="type-answer-input" class="input-field" placeholder="請在此打字輸入答案..." autocomplete="off">
-        <button id="type-submit-btn" class="option-btn" style="text-align:center; background:#ff9800; font-weight:bold;" onclick="checkTypeAnswer()">送出答案 🚀</button>
-      </div>
-
-      <div id="feedback" style="margin-top:10px; font-weight:bold; line-height:1.4;"></div>
-      <button id="after-answer-btn" class="option-btn" style="display:none; text-align:center; background:#4caf50;" onclick="handleAfterAnswer()">繼續 ➡️</button>
-    </div>
-  </div>
-
-  <!-- 4. 回合結算選單 -->
-  <div id="turn-modal" class="modal" style="display:none; align-items: flex-start; padding-top: 50px;">
-    <div class="modal-box" style="text-align:center;">
-      <h3 style="color:#ffeb3b;">🎯 方塊已就位！</h3>
-      <p>目前累積總分：<b id="turn-score" style="font-size:1.4rem; color:#4caf50;">0</b> 分</p>
-      <button class="option-btn" style="text-align:center; background:#4caf50;" onclick="continueToNextQuiz()">繼續挑戰下一題 ➡️</button>
-      <button id="turn-save-btn" class="option-btn" style="text-align:center; background:#ff9800;" onclick="saveAndExit()">💾 儲存並退出</button>
-    </div>
-  </div>
-
-  <!-- 5. 到底放置「防誤觸二次確認」彈窗 -->
-  <div id="drop-confirm-modal" class="modal" style="display:none; align-items:flex-start; padding-top:80px;">
-    <div class="modal-box" style="text-align:center; max-width:320px;">
-      <h3 style="color:#f44336; margin:0 0 10px;">⚠️ 確認到底放置？</h3>
-      <p style="font-size:0.9rem; color:#ccc; margin-bottom:15px;">方塊將直接落到底部固定，無法再移動或旋轉。</p>
-      <div style="display:flex; gap:10px;">
-        <button class="option-btn" style="text-align:center; background:#d32f2f; margin:0; flex:1; font-weight:bold;" onclick="confirmHardDrop()">確定到底</button>
-        <button class="option-btn" style="text-align:center; background:#555; margin:0; flex:1;" onclick="cancelHardDrop()">取消</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 6. 教師管理後台 -->
-  <div id="admin-modal" class="modal" style="display:none;">
-    <div class="modal-box">
-      <div class="tab-bar" style="display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <button class="tab-btn active" onclick="switchAdminTab('scores')">📊 全班戰況</button>
-          <button class="tab-btn" onclick="switchAdminTab('editQ')">📚 題庫檢視/改難度</button>
-          <button class="tab-btn" onclick="switchAdminTab('importExcel')">📑 批次匯入Excel</button>
-          <button class="tab-btn" onclick="switchAdminTab('addQ')">➕ 單題新增</button>
-        </div>
-        <button style="background:#d32f2f; color:white; border:none; padding:5px 8px; border-radius:4px; font-size:0.75rem; cursor:pointer;" onclick="logoutTeacher()">🚪 登出</button>
-      </div>
-
-      <!-- 頁籤一：全班戰況即時榜 -->
-      <div id="tab-scores">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:0.85rem; color:#aaa;">全班作答即時排行榜：</span>
-          <button style="padding:4px 8px; font-size:0.8rem; background:#0288d1; color:white; border:none; border-radius:4px; cursor:pointer;" onclick="fetchClassScores()">🔄 刷新榜單</button>
-        </div>
-        <div style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr>
-                <th>姓名</th>
-                <th>總分</th>
-                <th>答對</th>
-                <th>錯題紀錄</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="scores-tbody">
-              <tr><td colspan="5">讀取戰況中...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- 頁籤二：題庫檢視與難度調整 -->
-      <div id="tab-editQ" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:0.85rem; color:#aaa;">可直接在此調整題目難度或刪除題目：</span>
-          <button style="padding:4px 8px; font-size:0.8rem; background:#0288d1; color:white; border:none; border-radius:4px; cursor:pointer;" onclick="renderAdminQuestionsList()">🔄 重新讀取題庫</button>
-        </div>
-        <div style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr>
-                <th style="width:10%;">題號</th>
-                <th style="width:45%;">題目內容</th>
-                <th style="width:25%;">難度等級 (直接修改)</th>
-                <th style="width:20%;">操作</th>
-              </tr>
-            </thead>
-            <tbody id="admin-q-tbody">
-              <tr><td colspan="4">載入題庫中...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- 頁籤三：Excel 批次題庫匯入 -->
-      <div id="tab-importExcel" style="display:none; text-align:left;">
-        <h4 style="margin:5px 0 10px; color:#ffeb3b;">📑 Excel (.xlsx) 題庫批次上傳</h4>
-        <p style="font-size:0.85rem; color:#aaa; line-height:1.4;">直接上傳整份 Excel 題庫，系統自動寫入雲端試算表：</p>
-        <button class="option-btn" style="text-align:center; background:#673ab7; margin-bottom:15px;" onclick="downloadExcelTemplate()">📥 下載標準出題 Excel 範本</button>
-        <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="input-field" style="background:#222;">
-        <button class="option-btn" style="text-align:center; background:#4caf50; font-weight:bold;" onclick="processExcelUpload()">🚀 開始批次匯入至題庫</button>
-        <div id="import-status" style="margin-top:8px; font-size:0.85rem;"></div>
-      </div>
-
-      <!-- 頁籤四：單題新增 -->
-      <div id="tab-addQ" style="display:none;">
-        <label>題目難易度：</label>
-        <select id="adm-diff" class="input-field">
-          <option value="1">🌱 簡單（+1分）</option>
-          <option value="2" selected>📘 普通（+2分）</option>
-          <option value="3">⚡ 難（+3分）</option>
-          <option value="4">🔥 非常難（+4分）</option>
-          <option value="5">☠️ 地獄（+5分）</option>
-        </select>
-
-        <label>題型種類：</label>
-        <select id="adm-type" class="input-field" onchange="toggleAdminQuestionType()">
-          <option value="choice">四選一選擇題</option>
-          <option value="text">學生打字填空題</option>
-        </select>
-
-        <label>題目內容：</label>
-        <input type="text" id="adm-q" class="input-field" placeholder="題目文字...">
-        <label>圖片網址（可選）：</label>
-        <input type="text" id="adm-img" class="input-field" placeholder="https://.../photo.png">
-        
-        <div id="adm-choice-box">
-          <label>選項 1 ~ 4：</label>
-          <input type="text" id="adm-opt1" class="input-field" placeholder="選項 1">
-          <input type="text" id="adm-opt2" class="input-field" placeholder="選項 2">
-          <input type="text" id="adm-opt3" class="input-field" placeholder="選項 3">
-          <input type="text" id="adm-opt4" class="input-field" placeholder="選項 4">
-          <label>正確選項：</label>
-          <select id="adm-ans-choice" class="input-field">
-            <option value="1">選項 1</option>
-            <option value="2">選項 2</option>
-            <option value="3">選項 3</option>
-            <option value="4">選項 4</option>
-          </select>
-        </div>
-
-        <div id="adm-text-box" style="display:none;">
-          <label>正確答案（多個正解用逗號分隔）：</label>
-          <input type="text" id="adm-ans-text" class="input-field" placeholder="例如：玉山, Mt. Jade">
-        </div>
-
-        <label>答錯時是否公布解答？</label>
-        <select id="adm-show" class="input-field">
-          <option value="true">公布正解與解析</option>
-          <option value="false">不公布（挑戰思考題）</option>
-        </select>
-
-        <label>解析說明：</label>
-        <input type="text" id="adm-exp" class="input-field" placeholder="解析內容...">
-
-        <button class="option-btn" style="text-align:center; background:#e91e63;" onclick="submitNewQuestion()">➕ 寫入雲端題庫</button>
-      </div>
-
-      <div style="margin-top:15px; display:flex; gap:10px;">
-        <button class="option-btn" style="text-align:center; background:#4caf50; flex:1;" onclick="startTeacherTest()">🎮 進入試玩測試</button>
-        <button class="option-btn" style="text-align:center; background:#555; flex:1;" onclick="closeAdmin()">關閉後台</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 頂部資訊列 -->
-  <div>
+  <!-- 1. 頂部資訊列 (固定頂端) -->
+  <div id="top-bar">
     <button id="admin-entry-btn" class="top-bar-btn" style="background:#e91e63;" onclick="openAdmin()">⚙️ 教師管理戰報</button>
-  </div>
-  <div id="score-board">
-    選手: <span id="display-name">-</span> | 累計總分: <span id="score">0</span>
+    <div id="score-board">選手: <span id="display-name">-</span> | 累計總分: <span id="score">0</span></div>
   </div>
 
-  <!-- 主舞台 -->
+  <!-- 2. 中間主舞台 (自動等比例滿版拉伸) -->
   <div id="main-stage">
     <!-- 左側欄：風雲榜 + 暫存方塊箱 -->
     <div id="left-side-col">
-      <!-- 1. 班級風雲榜 -->
       <div id="side-leaderboard">
         <div style="font-weight:bold; color:#ffeb3b; border-bottom:1px solid #555; padding-bottom:3px; margin-bottom:4px; text-align:center;">
           🏆 班級風雲榜
         </div>
-        <div id="rank-list-box">
-          <div style="color:#aaa; font-size:0.7rem; text-align:center;">載入中...</div>
-        </div>
+        <div id="rank-list-box"><div style="color:#aaa; text-align:center;">載入中...</div></div>
       </div>
 
-      <!-- 2. 暫存方塊箱 (Hold Box) -->
       <div id="hold-box-container">
-        <div style="font-size:0.75rem; color:#81d4fa; font-weight:bold;">📦 暫存方塊</div>
-        <canvas id="hold-canvas" width="60" height="60"></canvas>
+        <div style="font-size:0.7rem; color:#81d4fa; font-weight:bold;">📦 暫存方塊</div>
+        <canvas id="hold-canvas" width="50" height="50"></canvas>
         <button class="hold-btn" onclick="handleHoldPiece()">暫存 / 換塊</button>
       </div>
     </div>
@@ -381,13 +194,183 @@
     </div>
   </div>
 
-  <!-- 手機控制按鈕（按鍵加大、間距加大） -->
+  <!-- 3. 底部控制按鈕區 (黏在手機螢幕底端，大拇指超舒適) -->
   <div id="mobile-controls">
     <button class="ctrl-btn" id="btn-left">⬅️</button>
     <button class="ctrl-btn" id="btn-right">➡️</button>
     <button class="ctrl-btn" id="btn-down">⬇️</button>
     <button class="ctrl-btn" id="btn-rotate">🔄</button>
     <button class="ctrl-btn drop-btn" onclick="requestHardDrop()">⚡ 到底放置</button>
+  </div>
+
+  <!-- 彈窗群 -->
+  <div id="login-modal" class="modal">
+    <div class="modal-box" style="text-align:center;">
+      <h3>🎮 答題俄羅斯方塊</h3>
+      <p style="font-size:0.85rem; color:#aaa; margin-bottom:15px;">請使用 Google 帳號登入驗證身分：</p>
+      <div id="g_id_onload" data-auto_prompt="false" data-callback="handleGoogleLogin"></div>
+      <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with"></div>
+      <div id="login-status" style="margin-top:12px; color:#81d4fa; font-size:0.85rem;"></div>
+    </div>
+  </div>
+
+  <div id="name-modal" class="modal" style="display:none;">
+    <div class="modal-box" style="text-align:center;">
+      <h3 style="color:#4caf50;">✅ Google 帳號驗證成功！</h3>
+      <p style="font-size:0.85rem; color:#aaa; text-align:left;">請輸入您的<strong>班級、座號與真實姓名</strong>：</p>
+      <input type="text" id="custom-name-input" class="input-field" placeholder="例如：302 05號 林小美">
+      <button class="option-btn" style="text-align:center; background:#4caf50; font-weight:bold;" onclick="confirmStudentName()">進入挑戰 ➡️</button>
+    </div>
+  </div>
+
+  <div id="quiz-modal" class="modal" style="display:none;">
+    <div class="modal-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; background:#333; padding:5px 8px; border-radius:6px;">
+        <span style="font-size:0.75rem; color:#ffeb3b; font-weight:bold;">🎯 出題最低門檻：</span>
+        <select id="user-diff-select" style="background:#222; color:#fff; border:1px solid #666; border-radius:4px; padding:2px 4px; font-size:0.75rem;" onchange="onDifficultyFilterChange()">
+          <option value="1">🌱 簡單以上 (全部)</option>
+          <option value="2">📘 普通以上</option>
+          <option value="3">⚡ 難以上</option>
+          <option value="4">🔥 非常難與地獄</option>
+          <option value="5">☠️ 僅地獄級</option>
+        </select>
+      </div>
+
+      <div id="q-diff-badge" class="diff-badge">難度載入中</div>
+      <span id="q-mastery-hint" style="font-size:0.72rem; color:#aaa; margin-left:6px;"></span>
+
+      <h3 id="q-title" style="margin-top:3px; font-size:1.1rem;">題目載入中...</h3>
+      <img id="q-image" class="q-img" style="display:none;" />
+      
+      <div id="options-container"></div>
+      <div id="typing-container" style="display:none;">
+        <input type="text" id="type-answer-input" class="input-field" placeholder="請在此打字輸入答案..." autocomplete="off">
+        <button id="type-submit-btn" class="option-btn" style="text-align:center; background:#ff9800; font-weight:bold;" onclick="checkTypeAnswer()">送出答案 🚀</button>
+      </div>
+
+      <div id="feedback" style="margin-top:8px; font-weight:bold; line-height:1.4;"></div>
+      <button id="after-answer-btn" class="option-btn" style="display:none; text-align:center; background:#4caf50;" onclick="handleAfterAnswer()">繼續 ➡️</button>
+    </div>
+  </div>
+
+  <div id="turn-modal" class="modal" style="display:none; align-items:flex-start; padding-top:40px;">
+    <div class="modal-box" style="text-align:center;">
+      <h3 style="color:#ffeb3b; margin:0 0 5px;">🎯 方塊已就位！</h3>
+      <p style="margin:5px 0 10px;">目前累積總分：<b id="turn-score" style="font-size:1.3rem; color:#4caf50;">0</b> 分</p>
+      <button class="option-btn" style="text-align:center; background:#4caf50;" onclick="continueToNextQuiz()">繼續挑戰下一題 ➡️</button>
+      <button id="turn-save-btn" class="option-btn" style="text-align:center; background:#ff9800;" onclick="saveAndExit()">💾 儲存並退出</button>
+    </div>
+  </div>
+
+  <div id="drop-confirm-modal" class="modal" style="display:none; align-items:flex-start; padding-top:60px;">
+    <div class="modal-box" style="text-align:center; max-width:320px;">
+      <h3 style="color:#f44336; margin:0 0 10px;">⚠️ 確認到底放置？</h3>
+      <p style="font-size:0.85rem; color:#ccc; margin-bottom:15px;">方塊將直接落到底部固定。</p>
+      <div style="display:flex; gap:10px;">
+        <button class="option-btn" style="text-align:center; background:#d32f2f; margin:0; flex:1; font-weight:bold;" onclick="confirmHardDrop()">確定到底</button>
+        <button class="option-btn" style="text-align:center; background:#555; margin:0; flex:1;" onclick="cancelHardDrop()">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-modal" class="modal" style="display:none;">
+    <div class="modal-box">
+      <div class="tab-bar" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <button class="tab-btn active" onclick="switchAdminTab('scores')">📊 全班戰況</button>
+          <button class="tab-btn" onclick="switchAdminTab('editQ')">📚 題庫檢視/改難度</button>
+          <button class="tab-btn" onclick="switchAdminTab('importExcel')">📑 批次匯入Excel</button>
+          <button class="tab-btn" onclick="switchAdminTab('addQ')">➕ 單題新增</button>
+        </div>
+        <button style="background:#d32f2f; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:0.75rem; cursor:pointer;" onclick="logoutTeacher()">🚪 登出</button>
+      </div>
+
+      <div id="tab-scores">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.8rem; color:#aaa;">全班作答即時排行榜：</span>
+          <button style="padding:4px 8px; font-size:0.75rem; background:#0288d1; color:white; border:none; border-radius:4px; cursor:pointer;" onclick="fetchClassScores()">🔄 刷新榜單</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>姓名</th><th>總分</th><th>答對</th><th>錯題紀錄</th><th>操作</th></tr>
+            </thead>
+            <tbody id="scores-tbody"><tr><td colspan="5">讀取戰況中...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-editQ" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.8rem; color:#aaa;">可直接在此調整題目難度或刪除題目：</span>
+          <button style="padding:4px 8px; font-size:0.75rem; background:#0288d1; color:white; border:none; border-radius:4px; cursor:pointer;" onclick="renderAdminQuestionsList()">🔄 刷新題庫</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th style="width:10%;">題號</th><th style="width:45%;">題目內容</th><th style="width:25%;">難度等級</th><th style="width:20%;">操作</th></tr>
+            </thead>
+            <tbody id="admin-q-tbody"><tr><td colspan="4">載入題庫中...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-importExcel" style="display:none; text-align:left;">
+        <h4 style="margin:5px 0 10px; color:#ffeb3b;">📑 Excel (.xlsx) 題庫批次上傳</h4>
+        <p style="font-size:0.8rem; color:#aaa; line-height:1.4;">直接上傳整份 Excel 題庫，系統自動寫入雲端試算表：</p>
+        <button class="option-btn" style="text-align:center; background:#673ab7; margin-bottom:12px; padding:10px;" onclick="downloadExcelTemplate()">📥 下載標準出題 Excel 範本</button>
+        <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="input-field" style="background:#222;">
+        <button class="option-btn" style="text-align:center; background:#4caf50; font-weight:bold;" onclick="processExcelUpload()">🚀 開始批次匯入至題庫</button>
+        <div id="import-status" style="margin-top:6px; font-size:0.8rem;"></div>
+      </div>
+
+      <div id="tab-addQ" style="display:none;">
+        <label>題目難易度：</label>
+        <select id="adm-diff" class="input-field">
+          <option value="1">🌱 簡單（+1分）</option>
+          <option value="2" selected>📘 普通（+2分）</option>
+          <option value="3">⚡ 難（+3分）</option>
+          <option value="4">🔥 非常難（+4分）</option>
+          <option value="5">☠️ 地獄（+5分）</option>
+        </select>
+        <label>題型種類：</label>
+        <select id="adm-type" class="input-field" onchange="toggleAdminQuestionType()">
+          <option value="choice">四選一選擇題</option>
+          <option value="text">學生打字填空題</option>
+        </select>
+        <label>題目內容：</label>
+        <input type="text" id="adm-q" class="input-field" placeholder="題目文字...">
+        <label>圖片網址（可選）：</label>
+        <input type="text" id="adm-img" class="input-field" placeholder="https://.../photo.png">
+        <div id="adm-choice-box">
+          <label>選項 1 ~ 4：</label>
+          <input type="text" id="adm-opt1" class="input-field" placeholder="選項 1">
+          <input type="text" id="adm-opt2" class="input-field" placeholder="選項 2">
+          <input type="text" id="adm-opt3" class="input-field" placeholder="選項 3">
+          <input type="text" id="adm-opt4" class="input-field" placeholder="選項 4">
+          <label>正確選項：</label>
+          <select id="adm-ans-choice" class="input-field">
+            <option value="1">選項 1</option><option value="2">選項 2</option><option value="3">選項 3</option><option value="4">選項 4</option>
+          </select>
+        </div>
+        <div id="adm-text-box" style="display:none;">
+          <label>正確答案（多個正解用逗號分隔）：</label>
+          <input type="text" id="adm-ans-text" class="input-field" placeholder="例如：玉山, Mt. Jade">
+        </div>
+        <label>答錯時是否公布解答？</label>
+        <select id="adm-show" class="input-field">
+          <option value="true">公布正解與解析</option><option value="false">不公布</option>
+        </select>
+        <label>解析說明：</label>
+        <input type="text" id="adm-exp" class="input-field" placeholder="解析內容...">
+        <button class="option-btn" style="text-align:center; background:#e91e63;" onclick="submitNewQuestion()">➕ 寫入雲端題庫</button>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:10px;">
+        <button class="option-btn" style="text-align:center; background:#4caf50; flex:1;" onclick="startTeacherTest()">🎮 進入試玩測試</button>
+        <button class="option-btn" style="text-align:center; background:#555; flex:1;" onclick="closeAdmin()">關閉後台</button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -398,7 +381,7 @@ const TEACHER_EMAIL = "s256724@gmail.com";
 
 document.getElementById("g_id_onload").setAttribute("data-client_id", GOOGLE_CLIENT_ID);
 
-/* ==================== 2. 核心變數與防刷分機制 ==================== */
+/* ==================== 2. 核心變數與邏輯 ==================== */
 let userEmail = "";
 let userName = "";
 let isTeacher = false;
@@ -416,9 +399,8 @@ let pendingReviewQIds = [];
 let roundCounter = 0;
 let selectedMinDiff = 1;
 
-// 【暫存方塊變數】
-let holdPieceType = null;        // 目前暫存的方塊種類 ('I', 'O', 'T'...)
-let hasUsedHoldThisRound = false; // 每回合只能暫存/替換一次
+let holdPieceType = null;
+let hasUsedHoldThisRound = false;
 
 const MAX_CORRECT_PER_Q = 5; 
 const REVIEW_INTERVAL = 2;   
@@ -528,13 +510,13 @@ async function loadQuestionsFromCloud() {
   if (data.status === "success") questions = data.questions;
 }
 
-/* ==================== 3. 暫存方塊機制 (Hold Piece) ==================== */
+/* ==================== 3. 暫存方塊機制 ==================== */
 const holdCanvas = document.getElementById("hold-canvas");
 const holdCtx = holdCanvas.getContext("2d");
-holdCtx.scale(15, 15); // 1格 15px
+holdCtx.scale(12.5, 12.5);
 
 function drawHoldCanvas() {
-  holdCtx.fillStyle = '#111';
+  holdCtx.fillStyle = '#000';
   holdCtx.fillRect(0, 0, holdCanvas.width, holdCanvas.height);
 
   if (holdPieceType) {
@@ -559,15 +541,12 @@ function drawHoldCanvas() {
 
 function handleHoldPiece() {
   if (gamePaused || !player.matrix) {
-    alert("目前沒有操作中的方塊可以暫存！");
-    return;
+    alert("目前沒有操作中的方塊可以暫存！"); return;
   }
   if (hasUsedHoldThisRound) {
-    alert("⚠️ 這回合已經使用過暫存機會囉！請先放置此方塊。");
-    return;
+    alert("⚠️ 這回合已經使用過暫存機會囉！請先放置此方塊。"); return;
   }
 
-  // 情況 A：暫存箱是空的
   if (!holdPieceType) {
     holdPieceType = player.type;
     drawHoldCanvas();
@@ -575,20 +554,17 @@ function handleHoldPiece() {
     player.matrix = null;
     gamePaused = true;
     draw();
-    alert("📦 已將方塊存入暫存箱！\n請回答下一題取得新方塊！");
+    alert("📦 已將方塊存入暫存箱！請回答下一題取得新方塊！");
     openQuiz();
-  } 
-  // 情況 B：暫存箱已有方塊，詢問是否替換
-  else {
-    const confirmSwap = confirm("📦 暫存箱已有方塊！\n是否要將【當前方塊】與【暫存箱方塊】進行交換替換？");
+  } else {
+    const confirmSwap = confirm("📦 暫存箱已有方塊！\n是否要將【當前方塊】與【暫存箱方塊】交換？");
     if (confirmSwap) {
       const oldType = player.type;
       player.type = holdPieceType;
       player.matrix = createPiece(holdPieceType);
       player.pos.y = 0;
       player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
-
-      holdPieceType = oldType; // 替換進暫存箱
+      holdPieceType = oldType;
       drawHoldCanvas();
       hasUsedHoldThisRound = true;
       draw();
@@ -596,22 +572,18 @@ function handleHoldPiece() {
   }
 }
 
-/* ==================== 4. 到底放置防誤觸機制 ==================== */
+/* ==================== 4. 到底放置防誤觸 ==================== */
 function requestHardDrop() {
   if (gamePaused || !player.matrix) return;
-  // 彈出防誤觸確認框
   document.getElementById("drop-confirm-modal").style.display = "flex";
 }
-
 function confirmHardDrop() {
   document.getElementById("drop-confirm-modal").style.display = "none";
   executeHardDrop();
 }
-
 function cancelHardDrop() {
   document.getElementById("drop-confirm-modal").style.display = "none";
 }
-
 function executeHardDrop() {
   if (gamePaused || !player.matrix) return;
   while (!collide(arena, player)) player.pos.y++;
@@ -620,7 +592,7 @@ function executeHardDrop() {
   draw();
 }
 
-/* ==================== 5. 智能抽題與答題 ==================== */
+/* ==================== 5. 出題與作答 ==================== */
 function onDifficultyFilterChange() {
   selectedMinDiff = Number(document.getElementById("user-diff-select").value);
   loadQuestion();
@@ -643,8 +615,7 @@ function pickNextQuestion() {
   });
 
   if (pool.length === 0) return null;
-  const randomQ = pool[Math.floor(Math.random() * pool.length)];
-  return { qData: randomQ, isReview: false };
+  return { qData: pool[Math.floor(Math.random() * pool.length)], isReview: false };
 }
 
 function openQuiz() {
@@ -656,10 +627,9 @@ function loadQuestion() {
   if (questions.length === 0) {
     alert("題庫為空，請老師至後台新增題目！"); return;
   }
-
   const result = pickNextQuestion();
   if (!result) {
-    alert(`🎉 恭喜！難度【${selectedMinDiff}級以上】題目皆已達標通關！\n請選擇其他難度！`);
+    alert(`🎉 難度【${selectedMinDiff}級以上】題目皆已達標通關！請切換其他難度！`);
     return;
   }
 
@@ -702,7 +672,6 @@ function loadQuestion() {
     typeContainer.style.display = "none";
     optContainer.style.display = "block";
     optContainer.innerHTML = "";
-
     qData.options.forEach((opt, index) => {
       const btn = document.createElement("button");
       btn.className = "option-btn";
@@ -728,7 +697,6 @@ function checkTypeAnswer() {
   const qData = currentQuestion;
   const userText = document.getElementById("type-answer-input").value.trim().toLowerCase();
   if (!userText) { alert("請先輸入答案！"); return; }
-
   document.getElementById("type-answer-input").disabled = true;
   document.getElementById("type-submit-btn").disabled = true;
 
@@ -752,11 +720,7 @@ function processAnswerResult(isRight, correctAnswerText) {
 
     qMasteryStats[qData.id] = (qMasteryStats[qData.id] || 0) + 1;
     const curMastery = qMasteryStats[qData.id];
-
-    let retirementMsg = "";
-    if (curMastery >= MAX_CORRECT_PER_Q) {
-      retirementMsg = " 🎓 [此題已完全精通(滿5次)，不再重複出現！]";
-    }
+    let retirementMsg = (curMastery >= MAX_CORRECT_PER_Q) ? " 🎓 [此題已滿5次精通淘汰！]" : "";
 
     feedback.style.color = "#4caf50";
     feedback.innerText = `🎉 答對了！獲得【+${diff.score}分】並取得隨機方塊！${retirementMsg}`;
@@ -766,20 +730,16 @@ function processAnswerResult(isRight, correctAnswerText) {
     const qShort = qData.q.length > 6 ? qData.q.substring(0, 6) + "..." : qData.q;
     const wrongInfo = `第${qData.id}題(${qShort})`;
     if (!wrongQuestions.includes(wrongInfo)) wrongQuestions.push(wrongInfo);
-
-    if (!pendingReviewQIds.includes(qData.id)) {
-      pendingReviewQIds.push(qData.id);
-    }
+    if (!pendingReviewQIds.includes(qData.id)) pendingReviewQIds.push(qData.id);
 
     feedback.style.color = "#f44336";
     if (qData.showAnswer) {
-      feedback.innerText = `❌ 答錯了！正確答案是：【${correctAnswerText}】。\n解析：${qData.explanation}\n(💡 此題稍後將再次重現複習！)`;
+      feedback.innerText = `❌ 答錯了！正確答案是：【${correctAnswerText}】。\n解析：${qData.explanation}`;
     } else {
       feedback.innerText = "❌ 答錯了！此題為思考題不公開答案，稍後將再次重現！";
     }
     nextBtn.innerText = "下一題 ➡️";
   }
-
   nextBtn.style.display = "block";
   autoSaveToCloud();
 }
@@ -798,14 +758,10 @@ function showTurnOptions() {
   document.getElementById("turn-score").innerText = totalScore;
   const turnModal = document.getElementById("turn-modal");
   const saveBtn = document.getElementById("turn-save-btn");
-
   if (saveBtn) {
     saveBtn.disabled = true;
     saveBtn.style.opacity = "0.6";
-    setTimeout(() => {
-      saveBtn.disabled = false;
-      saveBtn.style.opacity = "1";
-    }, 500);
+    setTimeout(() => { saveBtn.disabled = false; saveBtn.style.opacity = "1"; }, 500);
   }
   turnModal.style.display = "flex";
 }
@@ -821,7 +777,7 @@ function saveAndExit() {
   location.reload();
 }
 
-/* ==================== 6. 教師管理後台 ==================== */
+/* ==================== 6. 教師後台 ==================== */
 function openAdmin() {
   document.getElementById("admin-modal").style.display = "flex";
   fetchClassScores();
@@ -856,20 +812,17 @@ async function renderAdminQuestionsList() {
   const tbody = document.getElementById("admin-q-tbody");
   tbody.innerHTML = `<tr><td colspan="4">讀取雲端題庫中...</td></tr>`;
   await loadQuestionsFromCloud();
-
   if (questions.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4">目前雲端沒有任何題目</td></tr>`;
-    return;
+    tbody.innerHTML = `<tr><td colspan="4">目前雲端沒有任何題目</td></tr>`; return;
   }
-
   tbody.innerHTML = "";
   questions.forEach(q => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td><b>#${q.id}</b></td>
-      <td style="text-align:left; font-size:0.8rem;">${q.q}</td>
+      <td style="text-align:left; font-size:0.75rem;">${q.q}</td>
       <td>
-        <select id="diff-sel-${q.id}" style="background:#222; color:#fff; border:1px solid #666; border-radius:4px; padding:3px; font-size:0.75rem;">
+        <select id="diff-sel-${q.id}" style="background:#222; color:#fff; border:1px solid #666; border-radius:4px; padding:2px; font-size:0.72rem;">
           <option value="1" ${q.difficulty == 1 ? "selected" : ""}>🌱 簡單 (+1)</option>
           <option value="2" ${q.difficulty == 2 ? "selected" : ""}>📘 普通 (+2)</option>
           <option value="3" ${q.difficulty == 3 ? "selected" : ""}>⚡ 難 (+3)</option>
@@ -879,7 +832,7 @@ async function renderAdminQuestionsList() {
       </td>
       <td>
         <button class="save-mini-btn" onclick="saveQuestionDifficulty(${q.id})">💾 儲存</button>
-        <button class="del-btn" style="margin-left:4px;" onclick="deleteQuestionItem(${q.id})">🗑️</button>
+        <button class="del-btn" style="margin-left:3px;" onclick="deleteQuestionItem(${q.id})">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -892,7 +845,7 @@ async function saveQuestionDifficulty(qId) {
     method: "POST",
     body: JSON.stringify({ action: "updateQuestionDifficulty", id: qId, difficulty: newDiff })
   });
-  alert(`第 #${qId} 題難度已成功更新！`);
+  alert(`第 #${qId} 題難度已更新！`);
   await loadQuestionsFromCloud();
 }
 
@@ -929,11 +882,9 @@ async function fetchClassScores() {
     if (data.status === "success") {
       tbody.innerHTML = "";
       if (data.students.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5">目前尚無作答紀錄</td></tr>`;
-        return;
+        tbody.innerHTML = `<tr><td colspan="5">目前尚無作答紀錄</td></tr>`; return;
       }
       data.students.sort((a,b) => b.score - a.score);
-
       data.students.forEach(st => {
         let wrongHtml = `<span style="color:#4caf50;">無 (全對)</span>`;
         if (st.wrongList && st.wrongList !== "無" && st.wrongList !== "無 (全對)") {
@@ -945,14 +896,14 @@ async function fetchClassScores() {
           <td><b>${st.name}</b></td>
           <td style="color:#4caf50; font-weight:bold;">${st.score}</td>
           <td>${st.correctCount}</td>
-          <td style="color:#ff5252; font-size:0.75rem; text-align:left; line-height:1.4;">${wrongHtml}</td>
+          <td style="color:#ff5252; font-size:0.75rem; text-align:left; line-height:1.3;">${wrongHtml}</td>
           <td><button class="del-btn" onclick="deleteStudentRecord('${st.email}', '${st.name}')">🗑️ 刪除</button></td>
         `;
         tbody.appendChild(tr);
       });
     }
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:red;">載入失敗，請確認網路！</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="color:red;">載入失敗！</td></tr>`;
   }
 }
 
@@ -967,7 +918,7 @@ async function deleteStudentRecord(email, name) {
   updateSideLeaderboard();
 }
 
-/* ==================== 7. Excel 匯入與單題新增 ==================== */
+/* ==================== 7. Excel 批次處理 ==================== */
 function downloadExcelTemplate() {
   const templateData = [
     ["題目文字", "圖片網址(可留空)", "選項1", "選項2", "選項3", "選項4", "正確答案(選擇題填1-4/打字題填文字)", "是否公布解答(TRUE/FALSE)", "解析內容", "難度等級(1簡單-5地獄)", "題型(choice/text)"],
@@ -1020,7 +971,6 @@ function processExcelUpload() {
       }
 
       statusEl.innerText = `📤 正在批次匯入 ${parsedQuestions.length} 道題目至雲端...`;
-
       const res = await fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
         body: JSON.stringify({ action: "batchAddQuestions", questions: parsedQuestions })
@@ -1110,10 +1060,10 @@ async function updateSideLeaderboard() {
       });
       box.innerHTML = html;
     } else {
-      box.innerHTML = `<div style="color:#aaa; font-size:0.7rem; text-align:center;">暫無排名</div>`;
+      box.innerHTML = `<div style="color:#aaa; text-align:center;">暫無排名</div>`;
     }
   } catch (e) {
-    box.innerHTML = `<div style="color:#888; font-size:0.7rem; text-align:center;">更新榜單中...</div>`;
+    box.innerHTML = `<div style="color:#888; text-align:center;">更新中...</div>`;
   }
 }
 
@@ -1198,8 +1148,6 @@ function playerReset() {
   player.matrix = createPiece(chosenType);
   player.pos.y = 0;
   player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
-
-  // 每回合新方塊重置暫存權限
   hasUsedHoldThisRound = false;
 
   if (collide(arena, player)) {
@@ -1325,10 +1273,10 @@ document.addEventListener('keydown', e => {
   else if (e.key === "ArrowRight") playerMove(1);
   else if (e.key === "ArrowDown") playerDropSlow();
   else if (e.key === "ArrowUp") playerRotate();
-  else if (e.code === "Space") requestHardDrop(); // 鍵盤空白鍵也觸發確認
+  else if (e.code === "Space") requestHardDrop();
 });
 
-/* ==================== 10. 手機長按連發控制器 ==================== */
+/* ==================== 10. 長按連發控制器 ==================== */
 function bindContinuousPress(buttonId, actionFn, initialDelay = 180, repeatInterval = 60) {
   const btn = document.getElementById(buttonId);
   if (!btn) return;
