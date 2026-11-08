@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>俄羅斯方塊學習 - 難度篩選與防刷分版</title>
+  <title>俄羅斯方塊學習 - 暫存方塊與防誤觸版</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
@@ -20,22 +20,41 @@
     }
 
     #main-stage {
-      display: flex; gap: 12px; justify-content: center;
+      display: flex; gap: 10px; justify-content: center;
       align-items: flex-start; max-width: 100%;
     }
 
+    /* 左側側邊欄：風雲榜 + 暫存方塊區 */
+    #left-side-col {
+      display: flex; flex-direction: column; gap: 8px; width: 125px;
+    }
     #side-leaderboard {
-      width: 130px; background: #242424; border: 2px solid #444;
-      border-radius: 8px; padding: 8px 6px; font-size: 0.8rem; text-align: left;
+      background: #242424; border: 2px solid #444; border-radius: 8px;
+      padding: 6px 4px; font-size: 0.75rem; text-align: left;
     }
     .rank-item {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 5px 0; border-bottom: 1px solid #333;
+      padding: 4px 0; border-bottom: 1px solid #333;
     }
     .rank-item:last-child { border-bottom: none; }
     .rank-name {
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px;
     }
+
+    /* 暫存方塊箱樣式 */
+    #hold-box-container {
+      background: #242424; border: 2px solid #555; border-radius: 8px;
+      padding: 6px; text-align: center;
+    }
+    #hold-canvas {
+      background: #111; border: 1px solid #444; border-radius: 4px;
+      margin: 4px auto; display: block;
+    }
+    .hold-btn {
+      background: #0288d1; color: white; border: none; border-radius: 4px;
+      padding: 5px; font-size: 0.75rem; width: 100%; cursor: pointer; font-weight: bold;
+    }
+    .hold-btn:active { background: #01579b; }
 
     #game-container { 
       position: relative; border: 3px solid #555; background: #000;
@@ -50,16 +69,23 @@
     }
     #float-score.show { transform: translate(-50%, -120%); opacity: 1; }
 
+    /* 手機控制按鈕加大 + 間距優化 */
     #mobile-controls {
       display: grid; grid-template-columns: repeat(4, 1fr);
-      gap: 8px; width: 100%; max-width: 320px; margin-top: 10px;
+      gap: 10px; width: 100%; max-width: 340px; margin-top: 12px;
     }
     .ctrl-btn {
       background: #333; color: white; border: 2px solid #666;
-      border-radius: 8px; padding: 12px 0; font-size: 1.2rem; user-select: none;
+      border-radius: 10px; padding: 15px 0; font-size: 1.4rem; user-select: none;
     }
     .ctrl-btn:active { background: #555; }
-    .drop-btn { grid-column: span 4; background: #d32f2f; font-weight: bold; }
+    
+    /* 到底放置按鈕額外往下推開間距，防止誤觸 */
+    .drop-btn {
+      grid-column: span 4; background: #d32f2f; font-weight: bold;
+      font-size: 1.1rem; padding: 14px 0; margin-top: 16px; border-radius: 8px;
+    }
+    .drop-btn:active { background: #b71c1c; }
 
     .modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -134,10 +160,9 @@
     </div>
   </div>
 
-  <!-- 3. 答題視窗（支援難度篩選 + 防刷分 + 錯題間隔重複） -->
+  <!-- 3. 答題視窗 -->
   <div id="quiz-modal" class="modal" style="display:none;">
     <div class="modal-box">
-      <!-- 學生自選難度階梯 -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; background:#333; padding:6px 10px; border-radius:6px;">
         <span style="font-size:0.8rem; color:#ffeb3b; font-weight:bold;">🎯 出題難度最低門檻：</span>
         <select id="user-diff-select" style="background:#222; color:#fff; border:1px solid #666; border-radius:4px; padding:3px 6px; font-size:0.8rem;" onchange="onDifficultyFilterChange()">
@@ -176,7 +201,19 @@
     </div>
   </div>
 
-  <!-- 5. 教師管理後台 -->
+  <!-- 5. 到底放置「防誤觸二次確認」彈窗 -->
+  <div id="drop-confirm-modal" class="modal" style="display:none; align-items:flex-start; padding-top:80px;">
+    <div class="modal-box" style="text-align:center; max-width:320px;">
+      <h3 style="color:#f44336; margin:0 0 10px;">⚠️ 確認到底放置？</h3>
+      <p style="font-size:0.9rem; color:#ccc; margin-bottom:15px;">方塊將直接落到底部固定，無法再移動或旋轉。</p>
+      <div style="display:flex; gap:10px;">
+        <button class="option-btn" style="text-align:center; background:#d32f2f; margin:0; flex:1; font-weight:bold;" onclick="confirmHardDrop()">確定到底</button>
+        <button class="option-btn" style="text-align:center; background:#555; margin:0; flex:1;" onclick="cancelHardDrop()">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 教師管理後台 -->
   <div id="admin-modal" class="modal" style="display:none;">
     <div class="modal-box">
       <div class="tab-bar" style="display:flex; justify-content:space-between; align-items:center;">
@@ -213,7 +250,7 @@
         </div>
       </div>
 
-      <!-- 頁籤二：題庫檢視與難度調整（線上直接編輯） -->
+      <!-- 頁籤二：題庫檢視與難度調整 -->
       <div id="tab-editQ" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="font-size:0.85rem; color:#aaa;">可直接在此調整題目難度或刪除題目：</span>
@@ -317,28 +354,40 @@
 
   <!-- 主舞台 -->
   <div id="main-stage">
-    <div id="side-leaderboard">
-      <div style="font-weight:bold; color:#ffeb3b; border-bottom:1px solid #555; padding-bottom:4px; margin-bottom:6px; text-align:center;">
-        🏆 班級風雲榜
+    <!-- 左側欄：風雲榜 + 暫存方塊箱 -->
+    <div id="left-side-col">
+      <!-- 1. 班級風雲榜 -->
+      <div id="side-leaderboard">
+        <div style="font-weight:bold; color:#ffeb3b; border-bottom:1px solid #555; padding-bottom:3px; margin-bottom:4px; text-align:center;">
+          🏆 班級風雲榜
+        </div>
+        <div id="rank-list-box">
+          <div style="color:#aaa; font-size:0.7rem; text-align:center;">載入中...</div>
+        </div>
       </div>
-      <div id="rank-list-box">
-        <div style="color:#aaa; font-size:0.75rem; text-align:center;">載入中...</div>
+
+      <!-- 2. 暫存方塊箱 (Hold Box) -->
+      <div id="hold-box-container">
+        <div style="font-size:0.75rem; color:#81d4fa; font-weight:bold;">📦 暫存方塊</div>
+        <canvas id="hold-canvas" width="60" height="60"></canvas>
+        <button class="hold-btn" onclick="handleHoldPiece()">暫存 / 換塊</button>
       </div>
     </div>
 
+    <!-- 右側：俄羅斯方塊棋盤 -->
     <div id="game-container">
       <canvas id="tetris" width="240" height="400"></canvas>
       <div id="float-score">+0</div>
     </div>
   </div>
 
-  <!-- 手機按鈕 -->
+  <!-- 手機控制按鈕（按鍵加大、間距加大） -->
   <div id="mobile-controls">
     <button class="ctrl-btn" id="btn-left">⬅️</button>
     <button class="ctrl-btn" id="btn-right">➡️</button>
     <button class="ctrl-btn" id="btn-down">⬇️</button>
     <button class="ctrl-btn" id="btn-rotate">🔄</button>
-    <button class="ctrl-btn drop-btn" onclick="playerHardDrop()">⚡ 到底放置</button>
+    <button class="ctrl-btn drop-btn" onclick="requestHardDrop()">⚡ 到底放置</button>
   </div>
 
 <script>
@@ -354,7 +403,7 @@ let userEmail = "";
 let userName = "";
 let isTeacher = false;
 let questions = [];
-let currentQuestion = null; // 當前正在作答的題目物件
+let currentQuestion = null;
 let totalScore = 0;
 let correctCount = 0;
 let answeredCorrectly = false;
@@ -362,18 +411,17 @@ let arena = createMatrix(12, 20);
 let gamePaused = true;
 let wrongQuestions = [];
 
-// 【防刷分與間隔重複關鍵資料結構】
-// 記錄每道題學生答對幾次：{ [qId]: 次數 }
 let qMasteryStats = {}; 
-// 答錯待複習池（存 qId 陣列）
 let pendingReviewQIds = []; 
-// 答題計數器（用來控制每隔 2 回合出錯題）
 let roundCounter = 0;
-// 學生選擇的最低難度門檻（預設 1 = 簡單以上全部）
 let selectedMinDiff = 1;
 
-const MAX_CORRECT_PER_Q = 5; // 答對 5 次即淘汰不出現
-const REVIEW_INTERVAL = 2;   // 每隔 2 回合優先抽錯題重考
+// 【暫存方塊變數】
+let holdPieceType = null;        // 目前暫存的方塊種類 ('I', 'O', 'T'...)
+let hasUsedHoldThisRound = false; // 每回合只能暫存/替換一次
+
+const MAX_CORRECT_PER_Q = 5; 
+const REVIEW_INTERVAL = 2;   
 
 const diffConfigs = {
   1: { name: "🌱 簡單 (+1分)", class: "diff-1", score: 1 },
@@ -439,6 +487,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   }
   updateSideLeaderboard();
+  drawHoldCanvas();
 });
 
 async function confirmStudentName() {
@@ -458,11 +507,7 @@ async function confirmStudentName() {
       correctCount = data.correctCount;
       if (data.wrongList && data.wrongList !== "無 (全對)") wrongQuestions = data.wrongList.split("; ");
       if (data.arena && data.arena.length > 0) arena = data.arena;
-      
-      // 【關鍵升級】：從雲端還原每道題過去答對的次數！
-      if (data.qMastery) {
-        qMasteryStats = data.qMastery;
-      }
+      if (data.qMastery) qMasteryStats = data.qMastery;
     }
     document.getElementById("display-name").innerText = userName;
     updateScoreUI();
@@ -483,38 +528,121 @@ async function loadQuestionsFromCloud() {
   if (data.status === "success") questions = data.questions;
 }
 
-/* ==================== 3. 智能抽題演算法（難度過濾 + 錯題重現 + 防刷分） ==================== */
+/* ==================== 3. 暫存方塊機制 (Hold Piece) ==================== */
+const holdCanvas = document.getElementById("hold-canvas");
+const holdCtx = holdCanvas.getContext("2d");
+holdCtx.scale(15, 15); // 1格 15px
+
+function drawHoldCanvas() {
+  holdCtx.fillStyle = '#111';
+  holdCtx.fillRect(0, 0, holdCanvas.width, holdCanvas.height);
+
+  if (holdPieceType) {
+    const matrix = createPiece(holdPieceType);
+    const offset = {
+      x: (4 - matrix[0].length) / 2,
+      y: (4 - matrix.length) / 2
+    };
+    matrix.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value !== 0) {
+          holdCtx.fillStyle = colors[value];
+          holdCtx.fillRect(x + offset.x, y + offset.y, 1, 1);
+          holdCtx.lineWidth = 0.05;
+          holdCtx.strokeStyle = "#fff";
+          holdCtx.strokeRect(x + offset.x, y + offset.y, 1, 1);
+        }
+      });
+    });
+  }
+}
+
+function handleHoldPiece() {
+  if (gamePaused || !player.matrix) {
+    alert("目前沒有操作中的方塊可以暫存！");
+    return;
+  }
+  if (hasUsedHoldThisRound) {
+    alert("⚠️ 這回合已經使用過暫存機會囉！請先放置此方塊。");
+    return;
+  }
+
+  // 情況 A：暫存箱是空的
+  if (!holdPieceType) {
+    holdPieceType = player.type;
+    drawHoldCanvas();
+    hasUsedHoldThisRound = true;
+    player.matrix = null;
+    gamePaused = true;
+    draw();
+    alert("📦 已將方塊存入暫存箱！\n請回答下一題取得新方塊！");
+    openQuiz();
+  } 
+  // 情況 B：暫存箱已有方塊，詢問是否替換
+  else {
+    const confirmSwap = confirm("📦 暫存箱已有方塊！\n是否要將【當前方塊】與【暫存箱方塊】進行交換替換？");
+    if (confirmSwap) {
+      const oldType = player.type;
+      player.type = holdPieceType;
+      player.matrix = createPiece(holdPieceType);
+      player.pos.y = 0;
+      player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+
+      holdPieceType = oldType; // 替換進暫存箱
+      drawHoldCanvas();
+      hasUsedHoldThisRound = true;
+      draw();
+    }
+  }
+}
+
+/* ==================== 4. 到底放置防誤觸機制 ==================== */
+function requestHardDrop() {
+  if (gamePaused || !player.matrix) return;
+  // 彈出防誤觸確認框
+  document.getElementById("drop-confirm-modal").style.display = "flex";
+}
+
+function confirmHardDrop() {
+  document.getElementById("drop-confirm-modal").style.display = "none";
+  executeHardDrop();
+}
+
+function cancelHardDrop() {
+  document.getElementById("drop-confirm-modal").style.display = "none";
+}
+
+function executeHardDrop() {
+  if (gamePaused || !player.matrix) return;
+  while (!collide(arena, player)) player.pos.y++;
+  player.pos.y--;
+  lockPiece();
+  draw();
+}
+
+/* ==================== 5. 智能抽題與答題 ==================== */
 function onDifficultyFilterChange() {
   selectedMinDiff = Number(document.getElementById("user-diff-select").value);
-  loadQuestion(); // 切換難度後立即刷新出題
+  loadQuestion();
 }
 
 function pickNextQuestion() {
   roundCounter++;
-
-  // 1. 優先規則：檢查是否有「待複習錯題」，且達到每 2 回合出題間隔！
   if (pendingReviewQIds.length > 0 && (roundCounter % REVIEW_INTERVAL === 0)) {
-    const wrongQId = pendingReviewQIds.shift(); // 取出最早錯的題
+    const wrongQId = pendingReviewQIds.shift();
     const foundWrongQ = questions.find(q => String(q.id) === String(wrongQId));
     if (foundWrongQ && (qMasteryStats[foundWrongQ.id] || 0) < MAX_CORRECT_PER_Q) {
       return { qData: foundWrongQ, isReview: true };
     }
   }
 
-  // 2. 篩選符合條件的題目池：
-  // 條件 A：題目難度 >= 學生自選門檻（例如選非常難(4)，只出4、5級）
-  // 條件 B：該題目答對次數 < 5 次（答對滿5次自動淘汰防刷分）
   let pool = questions.filter(q => {
     const meetDiff = Number(q.difficulty) >= selectedMinDiff;
     const notMastered = (qMasteryStats[q.id] || 0) < MAX_CORRECT_PER_Q;
     return meetDiff && notMastered;
   });
 
-  // 若該難度題目全部都被答對5次精通了
-  if (pool.length === 0) {
-    return null;
-  }
-
+  if (pool.length === 0) return null;
   const randomQ = pool[Math.floor(Math.random() * pool.length)];
   return { qData: randomQ, isReview: false };
 }
@@ -531,7 +659,7 @@ function loadQuestion() {
 
   const result = pickNextQuestion();
   if (!result) {
-    alert(`🎉 恭喜！目前難度門檻【${selectedMinDiff}級以上】的所有題目，您皆已答對滿 5 次通關！\n請切換其他難度或挑戰更高等級！`);
+    alert(`🎉 恭喜！難度【${selectedMinDiff}級以上】題目皆已達標通關！\n請選擇其他難度！`);
     return;
   }
 
@@ -543,7 +671,6 @@ function loadQuestion() {
   badge.innerText = diff.name;
   badge.className = `diff-badge ${diff.class}`;
 
-  // 提示學生目前這題掌握度
   const curMastery = qMasteryStats[qData.id] || 0;
   const hintEl = document.getElementById("q-mastery-hint");
   if (result.isReview) {
@@ -623,13 +750,12 @@ function processAnswerResult(isRight, correctAnswerText) {
     updateScoreUI();
     showFloatingScore(diff.score, `難度加分`);
 
-    // 累計該題答對次數
     qMasteryStats[qData.id] = (qMasteryStats[qData.id] || 0) + 1;
     const curMastery = qMasteryStats[qData.id];
 
     let retirementMsg = "";
     if (curMastery >= MAX_CORRECT_PER_Q) {
-      retirementMsg = " 🎓 [此題已完全精通(滿5次)，將不再重複出現！]";
+      retirementMsg = " 🎓 [此題已完全精通(滿5次)，不再重複出現！]";
     }
 
     feedback.style.color = "#4caf50";
@@ -641,7 +767,6 @@ function processAnswerResult(isRight, correctAnswerText) {
     const wrongInfo = `第${qData.id}題(${qShort})`;
     if (!wrongQuestions.includes(wrongInfo)) wrongQuestions.push(wrongInfo);
 
-    // 【錯題排入待複習佇列】
     if (!pendingReviewQIds.includes(qData.id)) {
       pendingReviewQIds.push(qData.id);
     }
@@ -657,23 +782,6 @@ function processAnswerResult(isRight, correctAnswerText) {
 
   nextBtn.style.display = "block";
   autoSaveToCloud();
-}
-
-function autoSaveToCloud() {
-  const wrongText = wrongQuestions.length > 0 ? wrongQuestions.join("; ") : "無 (全對)";
-  fetch(GOOGLE_SCRIPT_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      action: "saveScore",
-      email: userEmail,
-      name: userName,
-      score: totalScore,
-      correctCount: correctCount,
-      wrongList: wrongText,
-      arena: arena,
-      qMastery: qMasteryStats // 【關鍵升級】：將最新每題作答進度同步至試算表！
-    })
-  }).then(() => updateSideLeaderboard());
 }
 
 function handleAfterAnswer() {
@@ -713,7 +821,7 @@ function saveAndExit() {
   location.reload();
 }
 
-/* ==================== 4. 教師管理後台（題庫線上檢視/改難度/刪除） ==================== */
+/* ==================== 6. 教師管理後台 ==================== */
 function openAdmin() {
   document.getElementById("admin-modal").style.display = "flex";
   fetchClassScores();
@@ -744,7 +852,6 @@ function switchAdminTab(tab) {
   }
 }
 
-// 線上題庫清單渲染與直接修改難度
 async function renderAdminQuestionsList() {
   const tbody = document.getElementById("admin-q-tbody");
   tbody.innerHTML = `<tr><td colspan="4">讀取雲端題庫中...</td></tr>`;
@@ -771,7 +878,7 @@ async function renderAdminQuestionsList() {
         </select>
       </td>
       <td>
-        <button class="save-mini-btn" onclick="saveQuestionDifficulty(${q.id})">💾 儲存難度</button>
+        <button class="save-mini-btn" onclick="saveQuestionDifficulty(${q.id})">💾 儲存</button>
         <button class="del-btn" style="margin-left:4px;" onclick="deleteQuestionItem(${q.id})">🗑️</button>
       </td>
     `;
@@ -779,34 +886,24 @@ async function renderAdminQuestionsList() {
   });
 }
 
-// 儲存修改的難度
 async function saveQuestionDifficulty(qId) {
   const newDiff = document.getElementById(`diff-sel-${qId}`).value;
-  try {
-    await fetch(GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "updateQuestionDifficulty", id: qId, difficulty: newDiff })
-    });
-    alert(`第 #${qId} 題難度已成功更新！全班立即同步！`);
-    await loadQuestionsFromCloud();
-  } catch (e) {
-    alert("更新難度失敗，請檢查網路連線！");
-  }
+  await fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "updateQuestionDifficulty", id: qId, difficulty: newDiff })
+  });
+  alert(`第 #${qId} 題難度已成功更新！`);
+  await loadQuestionsFromCloud();
 }
 
-// 刪除特定題目
 async function deleteQuestionItem(qId) {
-  if (!confirm(`確定要刪除第 #${qId} 題嗎？\n此動作將同步從雲端試算表中移除！`)) return;
-  try {
-    await fetch(GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "deleteQuestion", id: qId })
-    });
-    alert(`已成功刪除第 #${qId} 題！`);
-    renderAdminQuestionsList();
-  } catch (e) {
-    alert("刪除題目失敗！");
-  }
+  if (!confirm(`確定要刪除第 #${qId} 題嗎？`)) return;
+  await fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "deleteQuestion", id: qId })
+  });
+  alert(`已刪除第 #${qId} 題！`);
+  renderAdminQuestionsList();
 }
 
 function toggleAdminQuestionType() {
@@ -870,7 +967,7 @@ async function deleteStudentRecord(email, name) {
   updateSideLeaderboard();
 }
 
-/* ==================== 5. Excel 匯入與單題新增 ==================== */
+/* ==================== 7. Excel 匯入與單題新增 ==================== */
 function downloadExcelTemplate() {
   const templateData = [
     ["題目文字", "圖片網址(可留空)", "選項1", "選項2", "選項3", "選項4", "正確答案(選擇題填1-4/打字題填文字)", "是否公布解答(TRUE/FALSE)", "解析內容", "難度等級(1簡單-5地獄)", "題型(choice/text)"],
@@ -989,7 +1086,7 @@ function startTeacherTest() {
   openQuiz();
 }
 
-/* ==================== 6. 排行榜與自動存檔 ==================== */
+/* ==================== 8. 排行榜與自動存檔 ==================== */
 async function updateSideLeaderboard() {
   const box = document.getElementById("rank-list-box");
   try {
@@ -1013,10 +1110,10 @@ async function updateSideLeaderboard() {
       });
       box.innerHTML = html;
     } else {
-      box.innerHTML = `<div style="color:#aaa; font-size:0.75rem; text-align:center;">暫無排名</div>`;
+      box.innerHTML = `<div style="color:#aaa; font-size:0.7rem; text-align:center;">暫無排名</div>`;
     }
   } catch (e) {
-    box.innerHTML = `<div style="color:#888; font-size:0.75rem; text-align:center;">更新榜單中...</div>`;
+    box.innerHTML = `<div style="color:#888; font-size:0.7rem; text-align:center;">更新榜單中...</div>`;
   }
 }
 
@@ -1025,24 +1122,20 @@ function autoSaveToCloud() {
   fetch(GOOGLE_SCRIPT_URL, {
     method: "POST",
     body: JSON.stringify({
-      action: "saveScore",
-      email: userEmail,
-      name: userName,
-      score: totalScore,
-      correctCount: correctCount,
-      wrongList: wrongText,
-      arena: arena,
-      qMastery: qMasteryStats // 【關鍵升級】：將最新每題作答進度同步至試算表！
+      action: "saveScore", email: userEmail, name: userName,
+      score: totalScore, correctCount: correctCount,
+      wrongList: wrongText, arena: arena,
+      qMastery: qMasteryStats
     })
   }).then(() => updateSideLeaderboard());
 }
 
-/* ==================== 7. 方塊核心引擎（無限累積機制） ==================== */
+/* ==================== 9. 方塊核心引擎 ==================== */
 const canvas = document.getElementById("tetris");
 const context = canvas.getContext("2d");
 context.scale(20, 20);
 
-const player = { pos: {x: 0, y: 0}, matrix: null };
+const player = { pos: {x: 0, y: 0}, matrix: null, type: null };
 let clearingRows = [];
 let flashState = false;
 
@@ -1100,9 +1193,14 @@ function drawMatrix(matrix, offset) {
 
 function playerReset() {
   const pieces = 'ILJOZST';
-  player.matrix = createPiece(pieces[Math.floor(pieces.length * Math.random())]);
+  const chosenType = pieces[Math.floor(pieces.length * Math.random())];
+  player.type = chosenType;
+  player.matrix = createPiece(chosenType);
   player.pos.y = 0;
   player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+
+  // 每回合新方塊重置暫存權限
+  hasUsedHoldThisRound = false;
 
   if (collide(arena, player)) {
     alert(`💥 棋盤已堆滿！\n已為您清空棋盤，目前累積總分【${totalScore} 分】將繼續累加，請繼續挑戰！`);
@@ -1206,14 +1304,6 @@ function playerDropSlow() {
   draw();
 }
 
-function playerHardDrop() {
-  if (gamePaused) return;
-  while (!collide(arena, player)) player.pos.y++;
-  player.pos.y--;
-  lockPiece();
-  draw();
-}
-
 function playerRotate() {
   if (gamePaused) return;
   const m = player.matrix;
@@ -1235,10 +1325,10 @@ document.addEventListener('keydown', e => {
   else if (e.key === "ArrowRight") playerMove(1);
   else if (e.key === "ArrowDown") playerDropSlow();
   else if (e.key === "ArrowUp") playerRotate();
-  else if (e.code === "Space") playerHardDrop();
+  else if (e.code === "Space") requestHardDrop(); // 鍵盤空白鍵也觸發確認
 });
 
-/* ==================== 8. 手機長按連發控制器 ==================== */
+/* ==================== 10. 手機長按連發控制器 ==================== */
 function bindContinuousPress(buttonId, actionFn, initialDelay = 180, repeatInterval = 60) {
   const btn = document.getElementById(buttonId);
   if (!btn) return;
