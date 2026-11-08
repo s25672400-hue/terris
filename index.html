@@ -13,18 +13,19 @@
   <style>
     * { box-sizing: border-box; touch-action: manipulation; -webkit-touch-callout: none; }
     
+    /* 舊機相容佈局：嚴格使用傳統相容技術，確保各機型完全一致 */
     html, body {
-      width: 100%; height: 100%; height: 100dvh;
+      width: 100%; height: 100%; height: 100vh; height: 100dvh;
       margin: 0; padding: 0; background: #121212; color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       overflow: hidden; display: flex; flex-direction: column;
       justify-content: space-between; align-items: center;
     }
 
-    /* 頂部資訊列 (緊湊) */
+    /* 頂部資訊列 (固定高度，禁止擠壓) */
     #top-bar {
-      width: 100%; padding: 4px 8px; display: flex;
-      flex-direction: column; align-items: center; z-index: 10;
+      flex-shrink: 0; width: 100%; padding: 4px 8px;
+      display: flex; flex-direction: column; align-items: center; z-index: 10;
     }
     #score-board { font-size: 0.95rem; color: #ffeb3b; font-weight: bold; }
     .top-bar-btn {
@@ -32,21 +33,22 @@
       border-radius: 20px; font-size: 0.75rem; margin-top: 2px; cursor: pointer; font-weight: bold;
     }
 
-    /* 中間主舞台：最大化利用垂直高度！ */
+    /* 中間舞台：居中對齊，不隨意溢出 */
     #main-stage {
-      flex: 1; width: 100%; display: flex; gap: 8px;
-      justify-content: center; align-items: center; padding: 4px 8px;
+      flex: 1; width: 100%; display: flex; gap: 10px;
+      justify-content: center; align-items: center; padding: 2px 8px;
       overflow: hidden; min-height: 0;
     }
 
-    /* 左側欄 (瘦身，寬度縮至 95px，把空間全讓給棋盤) */
+    /* 【關鍵修復】：左側欄寬度強制固定 95px，禁止縮小(flex-shrink:0)，絕不變竹竿！ */
     #left-side-col {
-      display: flex; flex-direction: column; gap: 6px; width: 95px;
-      justify-content: center; height: 100%;
+      width: 95px; min-width: 95px; max-width: 95px;
+      flex-shrink: 0 !important;
+      display: flex; flex-direction: column; gap: 6px; justify-content: center;
     }
     #side-leaderboard {
       background: #222; border: 1.5px solid #444; border-radius: 6px;
-      padding: 4px 3px; font-size: 0.68rem; text-align: left;
+      padding: 4px; font-size: 0.7rem; text-align: left;
     }
     .rank-item {
       display: flex; justify-content: space-between; align-items: center;
@@ -54,7 +56,7 @@
     }
     .rank-item:last-child { border-bottom: none; }
     .rank-name {
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 52px;
     }
 
     #hold-box-container {
@@ -63,20 +65,20 @@
     }
     #hold-canvas {
       background: #000; border: 1px solid #333; border-radius: 4px;
-      margin: 2px auto; display: block;
+      margin: 3px auto; display: block;
     }
     .hold-btn {
       background: #0288d1; color: white; border: none; border-radius: 4px;
-      padding: 3px; font-size: 0.68rem; width: 100%; cursor: pointer; font-weight: bold;
+      padding: 4px; font-size: 0.7rem; width: 100%; cursor: pointer; font-weight: bold;
     }
 
-    /* 俄羅斯方塊棋盤：解除限制，強制吃滿中間所有剩餘高度！ */
+    /* 【關鍵修復】：棋盤比例穩固 (寬216px x 高360px，按12:20標準打造)，禁止失控放大！ */
     #game-container { 
       position: relative; border: 3px solid #555; background: #000;
-      height: 98%; max-height: calc(100dvh - 240px); aspect-ratio: 12 / 20;
+      width: 216px; height: 360px; flex-shrink: 0 !important;
       border-radius: 6px; overflow: hidden; display: flex; justify-content: center;
     }
-    canvas#tetris { width: 100%; height: 100%; object-fit: contain; display: block; }
+    canvas#tetris { width: 100%; height: 100%; display: block; }
     
     #float-score {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -86,31 +88,32 @@
     }
     #float-score.show { transform: translate(-50%, -120%); opacity: 1; }
 
-    /* 控制按鈕區：方向鍵向上提，到底放置拉開大距離！ */
+    /* 【關鍵修復】：控制區禁止被壓縮(flex-shrink:0)，大小穩定舒適 */
     #mobile-controls {
-      width: 100%; max-width: 360px; padding: 4px 12px calc(12px + env(safe-area-inset-bottom));
+      flex-shrink: 0 !important; width: 100%; max-width: 350px;
+      padding: 4px 12px calc(12px + env(safe-area-inset-bottom));
       display: flex; flex-direction: column;
     }
     
-    /* 上排方向鍵 */
     #dir-pad {
       display: grid; grid-template-columns: repeat(4, 1fr);
       gap: 10px; width: 100%;
     }
     .ctrl-btn {
+      height: 52px; line-height: 48px;
       background: #2a2a2a; color: white; border: 2px solid #555;
-      border-radius: 12px; padding: 15px 0; font-size: 1.45rem; user-select: none;
-      box-shadow: 0 4px #111;
+      border-radius: 12px; font-size: 1.45rem; user-select: none;
+      box-shadow: 0 3px #111;
     }
-    .ctrl-btn:active { background: #444; transform: translateY(2px); box-shadow: 0 2px #111; }
+    .ctrl-btn:active { background: #444; transform: translateY(2px); box-shadow: 0 1px #111; }
     
-    /* 到底放置按鈕：依照您的標註，與上方方向鍵大幅拉開 28px 緩衝區！ */
+    /* 到底放置大間距拉開 24px */
     .drop-btn {
-      width: 100%; background: #d32f2f; font-weight: bold; color: white;
-      font-size: 1.15rem; padding: 14px 0; margin-top: 28px; border-radius: 10px;
-      border: 2px solid #b71c1c; box-shadow: 0 4px #7f0000; cursor: pointer;
+      height: 46px; width: 100%; background: #d32f2f; font-weight: bold; color: white;
+      font-size: 1.1rem; margin-top: 24px; border-radius: 10px;
+      border: 2px solid #b71c1c; box-shadow: 0 3px #7f0000; cursor: pointer;
     }
-    .drop-btn:active { background: #b71c1c; transform: translateY(2px); box-shadow: 0 2px #500; }
+    .drop-btn:active { background: #b71c1c; transform: translateY(2px); box-shadow: 0 1px #500; }
 
     /* 彈窗樣式 */
     .modal {
@@ -171,7 +174,7 @@
     <div id="score-board">選手: <span id="display-name">-</span> | 累計總分: <span id="score">0</span></div>
   </div>
 
-  <!-- 2. 中間主舞台 (棋盤極大化) -->
+  <!-- 2. 中間主舞台 (嚴格防變形) -->
   <div id="main-stage">
     <div id="left-side-col">
       <div id="side-leaderboard">
@@ -188,14 +191,14 @@
       </div>
     </div>
 
-    <!-- 棋盤自動伸展填滿所有剩餘空間 -->
+    <!-- 棋盤標準尺寸 -->
     <div id="game-container">
       <canvas id="tetris" width="240" height="400"></canvas>
       <div id="float-score">+0</div>
     </div>
   </div>
 
-  <!-- 3. 控制按鈕區 (上下拉開 28px 大間距) -->
+  <!-- 3. 底部控制按鈕區 -->
   <div id="mobile-controls">
     <div id="dir-pad">
       <button class="ctrl-btn" id="btn-left">⬅️</button>
@@ -206,7 +209,7 @@
     <button class="drop-btn" onclick="requestHardDrop()">⚡ 到底放置</button>
   </div>
 
-  <!-- 登入與其他彈窗群保持完備 -->
+  <!-- 彈窗群 -->
   <div id="login-modal" class="modal">
     <div class="modal-box" style="text-align:center;">
       <h3>🎮 答題俄羅斯方塊</h3>
@@ -384,7 +387,7 @@ const TEACHER_EMAIL = "s256724@gmail.com";
 
 document.getElementById("g_id_onload").setAttribute("data-client_id", GOOGLE_CLIENT_ID);
 
-/* ==================== 2. 核心變數與邏輯 ==================== */
+/* ==================== 2. 核心變數 ==================== */
 let userEmail = "";
 let userName = "";
 let isTeacher = false;
@@ -493,6 +496,12 @@ async function confirmStudentName() {
       if (data.wrongList && data.wrongList !== "無 (全對)") wrongQuestions = data.wrongList.split("; ");
       if (data.arena && data.arena.length > 0) arena = data.arena;
       if (data.qMastery) qMasteryStats = data.qMastery;
+      
+      // 【關鍵還原】：從雲端還原暫存方塊
+      if (data.holdPiece) {
+        holdPieceType = data.holdPiece;
+        drawHoldCanvas();
+      }
     }
     document.getElementById("display-name").innerText = userName;
     updateScoreUI();
@@ -557,6 +566,7 @@ function handleHoldPiece() {
     player.matrix = null;
     gamePaused = true;
     draw();
+    autoSaveToCloud(); // 立即同步暫存方塊到雲端！
     alert("📦 已將方塊存入暫存箱！請回答下一題取得新方塊！");
     openQuiz();
   } else {
@@ -571,6 +581,7 @@ function handleHoldPiece() {
       drawHoldCanvas();
       hasUsedHoldThisRound = true;
       draw();
+      autoSaveToCloud(); // 替換後同步到雲端！
     }
   }
 }
@@ -1078,7 +1089,8 @@ function autoSaveToCloud() {
       action: "saveScore", email: userEmail, name: userName,
       score: totalScore, correctCount: correctCount,
       wrongList: wrongText, arena: arena,
-      qMastery: qMasteryStats
+      qMastery: qMasteryStats,
+      holdPiece: holdPieceType || "" // 【同步暫存方塊】
     })
   }).then(() => updateSideLeaderboard());
 }
@@ -1279,7 +1291,7 @@ document.addEventListener('keydown', e => {
   else if (e.code === "Space") requestHardDrop();
 });
 
-/* ==================== 10. 長按連發控制器 ==================== */
+/* ==================== 10. 手機長按控制器 ==================== */
 function bindContinuousPress(buttonId, actionFn, initialDelay = 180, repeatInterval = 60) {
   const btn = document.getElementById(buttonId);
   if (!btn) return;
