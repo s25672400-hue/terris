@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>俄羅斯方塊學習 - 競賽排行與題庫匯入版</title>
+  <title>俄羅斯方塊學習 - 難度篩選與防刷分版</title>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- 引入 SheetJS 讓網頁原生解析與生成 Excel 檔案 -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     * { box-sizing: border-box; touch-action: manipulation; -webkit-touch-callout: none; }
@@ -20,13 +19,11 @@
       border-radius: 20px; font-size: 0.85rem; margin: 4px; cursor: pointer; font-weight: bold;
     }
 
-    /* 主舞台佈局：左側排行榜 + 右側遊戲棋盤 */
     #main-stage {
       display: flex; gap: 12px; justify-content: center;
       align-items: flex-start; max-width: 100%;
     }
 
-    /* 遊戲畫面左側即時排行榜 */
     #side-leaderboard {
       width: 130px; background: #242424; border: 2px solid #444;
       border-radius: 8px; padding: 8px 6px; font-size: 0.8rem; text-align: left;
@@ -71,7 +68,7 @@
     }
     .modal-box {
       background: #2a2a2a; padding: 20px; border-radius: 12px;
-      width: 95%; max-width: 540px; text-align: left; max-height: 90vh; overflow-y: auto;
+      width: 95%; max-width: 560px; text-align: left; max-height: 90vh; overflow-y: auto;
     }
     .option-btn {
       width: 100%; margin: 8px 0; padding: 12px; font-size: 1rem;
@@ -98,14 +95,18 @@
     .tab-bar { display: flex; border-bottom: 2px solid #444; margin-bottom: 15px; }
     .tab-btn {
       padding: 10px 8px; background: transparent; color: #aaa;
-      border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold;
+      border: none; cursor: pointer; font-size: 0.85rem; font-weight: bold;
     }
     .tab-btn.active { color: #ffeb3b; border-bottom: 3px solid #ffeb3b; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.82rem; }
     th, td { border: 1px solid #444; padding: 8px; text-align: center; vertical-align: middle; }
     th { background: #333; color: #ffeb3b; }
     .del-btn {
       background: #d32f2f; color: white; border: none; border-radius: 4px;
+      padding: 4px 8px; font-size: 0.75rem; cursor: pointer;
+    }
+    .save-mini-btn {
+      background: #4caf50; color: white; border: none; border-radius: 4px;
       padding: 4px 8px; font-size: 0.75rem; cursor: pointer;
     }
   </style>
@@ -133,11 +134,25 @@
     </div>
   </div>
 
-  <!-- 3. 答題視窗 -->
+  <!-- 3. 答題視窗（支援難度篩選 + 防刷分 + 錯題間隔重複） -->
   <div id="quiz-modal" class="modal" style="display:none;">
     <div class="modal-box">
+      <!-- 學生自選難度階梯 -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; background:#333; padding:6px 10px; border-radius:6px;">
+        <span style="font-size:0.8rem; color:#ffeb3b; font-weight:bold;">🎯 出題難度最低門檻：</span>
+        <select id="user-diff-select" style="background:#222; color:#fff; border:1px solid #666; border-radius:4px; padding:3px 6px; font-size:0.8rem;" onchange="onDifficultyFilterChange()">
+          <option value="1">🌱 簡單以上 (全部)</option>
+          <option value="2">📘 普通以上</option>
+          <option value="3">⚡ 難以上</option>
+          <option value="4">🔥 非常難與地獄</option>
+          <option value="5">☠️ 僅地獄級</option>
+        </select>
+      </div>
+
       <div id="q-diff-badge" class="diff-badge">難度載入中</div>
-      <h3 id="q-title" style="margin-top:0;">題目載入中...</h3>
+      <span id="q-mastery-hint" style="font-size:0.75rem; color:#aaa; margin-left:8px;"></span>
+
+      <h3 id="q-title" style="margin-top:5px;">題目載入中...</h3>
       <img id="q-image" class="q-img" style="display:none;" />
       
       <div id="options-container"></div>
@@ -166,14 +181,15 @@
     <div class="modal-box">
       <div class="tab-bar" style="display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <button class="tab-btn active" onclick="switchAdminTab('scores')">📊 全班戰況即時榜</button>
+          <button class="tab-btn active" onclick="switchAdminTab('scores')">📊 全班戰況</button>
+          <button class="tab-btn" onclick="switchAdminTab('editQ')">📚 題庫檢視/改難度</button>
           <button class="tab-btn" onclick="switchAdminTab('importExcel')">📑 批次匯入Excel</button>
           <button class="tab-btn" onclick="switchAdminTab('addQ')">➕ 單題新增</button>
         </div>
         <button style="background:#d32f2f; color:white; border:none; padding:5px 8px; border-radius:4px; font-size:0.75rem; cursor:pointer;" onclick="logoutTeacher()">🚪 登出</button>
       </div>
 
-      <!-- 頁籤一：全班戰況即時榜（含刪除名單功能） -->
+      <!-- 頁籤一：全班戰況即時榜 -->
       <div id="tab-scores">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="font-size:0.85rem; color:#aaa;">全班作答即時排行榜：</span>
@@ -197,23 +213,40 @@
         </div>
       </div>
 
-      <!-- 頁籤二：Excel 批次題庫匯入 -->
+      <!-- 頁籤二：題庫檢視與難度調整（線上直接編輯） -->
+      <div id="tab-editQ" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.85rem; color:#aaa;">可直接在此調整題目難度或刪除題目：</span>
+          <button style="padding:4px 8px; font-size:0.8rem; background:#0288d1; color:white; border:none; border-radius:4px; cursor:pointer;" onclick="renderAdminQuestionsList()">🔄 重新讀取題庫</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:10%;">題號</th>
+                <th style="width:45%;">題目內容</th>
+                <th style="width:25%;">難度等級 (直接修改)</th>
+                <th style="width:20%;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="admin-q-tbody">
+              <tr><td colspan="4">載入題庫中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 頁籤三：Excel 批次題庫匯入 -->
       <div id="tab-importExcel" style="display:none; text-align:left;">
         <h4 style="margin:5px 0 10px; color:#ffeb3b;">📑 Excel (.xlsx) 題庫批次上傳</h4>
-        <p style="font-size:0.85rem; color:#aaa; line-height:1.4;">
-          可以直接將整份 Excel 題庫一次上傳寫入雲端試算表，避免手動輸入負荷過重！
-        </p>
-
+        <p style="font-size:0.85rem; color:#aaa; line-height:1.4;">直接上傳整份 Excel 題庫，系統自動寫入雲端試算表：</p>
         <button class="option-btn" style="text-align:center; background:#673ab7; margin-bottom:15px;" onclick="downloadExcelTemplate()">📥 下載標準出題 Excel 範本</button>
-
-        <label style="font-weight:bold;">選擇您的題庫 Excel 檔案：</label>
         <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="input-field" style="background:#222;">
-
         <button class="option-btn" style="text-align:center; background:#4caf50; font-weight:bold;" onclick="processExcelUpload()">🚀 開始批次匯入至題庫</button>
         <div id="import-status" style="margin-top:8px; font-size:0.85rem;"></div>
       </div>
 
-      <!-- 頁籤三：單題新增 -->
+      <!-- 頁籤四：單題新增 -->
       <div id="tab-addQ" style="display:none;">
         <label>題目難易度：</label>
         <select id="adm-diff" class="input-field">
@@ -232,7 +265,6 @@
 
         <label>題目內容：</label>
         <input type="text" id="adm-q" class="input-field" placeholder="題目文字...">
-        
         <label>圖片網址（可選）：</label>
         <input type="text" id="adm-img" class="input-field" placeholder="https://.../photo.png">
         
@@ -283,9 +315,8 @@
     選手: <span id="display-name">-</span> | 累計總分: <span id="score">0</span>
   </div>
 
-  <!-- 主舞台：左側排行榜 + 右側遊戲畫布 -->
+  <!-- 主舞台 -->
   <div id="main-stage">
-    <!-- 1. 遊戲畫面左側即時排行榜 -->
     <div id="side-leaderboard">
       <div style="font-weight:bold; color:#ffeb3b; border-bottom:1px solid #555; padding-bottom:4px; margin-bottom:6px; text-align:center;">
         🏆 班級風雲榜
@@ -295,7 +326,6 @@
       </div>
     </div>
 
-    <!-- 2. 俄羅斯方塊棋盤 -->
     <div id="game-container">
       <canvas id="tetris" width="240" height="400"></canvas>
       <div id="float-score">+0</div>
@@ -315,22 +345,35 @@
 /* ==================== 1. 老師設定區 ==================== */
 const GOOGLE_CLIENT_ID = "479239925260-p9kvntbmlp23ginho02tou72ckg0n9f1.apps.googleusercontent.com";
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzWLVLbAAVd3rGVktP08gluiIqzSn4xSl-0QFRZF8wNcEqCN9d-MFeEX8YO3MIEFJOV/exec";
-const TEACHER_EMAIL = "s256724@gmail.com"; // 替換為您的 Gmail！
+const TEACHER_EMAIL = "s256724@gmail.com";
 
 document.getElementById("g_id_onload").setAttribute("data-client_id", GOOGLE_CLIENT_ID);
 
-/* ==================== 2. 身分驗證 ==================== */
+/* ==================== 2. 核心變數與防刷分機制 ==================== */
 let userEmail = "";
 let userName = "";
 let isTeacher = false;
 let questions = [];
-let currentQIndex = 0;
+let currentQuestion = null; // 當前正在作答的題目物件
 let totalScore = 0;
 let correctCount = 0;
 let answeredCorrectly = false;
 let arena = createMatrix(12, 20);
 let gamePaused = true;
 let wrongQuestions = [];
+
+// 【防刷分與間隔重複關鍵資料結構】
+// 記錄每道題學生答對幾次：{ [qId]: 次數 }
+let qMasteryStats = {}; 
+// 答錯待複習池（存 qId 陣列）
+let pendingReviewQIds = []; 
+// 答題計數器（用來控制每隔 2 回合出錯題）
+let roundCounter = 0;
+// 學生選擇的最低難度門檻（預設 1 = 簡單以上全部）
+let selectedMinDiff = 1;
+
+const MAX_CORRECT_PER_Q = 5; // 答對 5 次即淘汰不出現
+const REVIEW_INTERVAL = 2;   // 每隔 2 回合優先抽錯題重考
 
 const diffConfigs = {
   1: { name: "🌱 簡單 (+1分)", class: "diff-1", score: 1 },
@@ -395,7 +438,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       localStorage.removeItem("remembered_teacher");
     }
   }
-  updateSideLeaderboard(); // 載入畫面時初次更新左側榜單
+  updateSideLeaderboard();
 });
 
 async function confirmStudentName() {
@@ -435,38 +478,220 @@ async function loadQuestionsFromCloud() {
   if (data.status === "success") questions = data.questions;
 }
 
-/* ==================== 3. 遊戲畫面左側即時排行榜 ==================== */
-async function updateSideLeaderboard() {
-  const box = document.getElementById("rank-list-box");
-  try {
-    const res = await fetch(GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "getAllScores" })
-    });
-    const data = await res.json();
-    if (data.status === "success" && data.students.length > 0) {
-      data.students.sort((a,b) => b.score - a.score);
-      const topList = data.students.slice(0, 5); // 顯示前 5 名
-      let html = "";
-      const medals = ["🥇", "🥈", "🥉", "4.", "5."];
-      topList.forEach((st, idx) => {
-        html += `
-          <div class="rank-item">
-            <span>${medals[idx]} <span class="rank-name">${st.name}</span></span>
-            <b style="color:#ffeb3b;">${st.score}分</b>
-          </div>
-        `;
-      });
-      box.innerHTML = html;
-    } else {
-      box.innerHTML = `<div style="color:#aaa; font-size:0.75rem; text-align:center;">暫無排名</div>`;
+/* ==================== 3. 智能抽題演算法（難度過濾 + 錯題重現 + 防刷分） ==================== */
+function onDifficultyFilterChange() {
+  selectedMinDiff = Number(document.getElementById("user-diff-select").value);
+  loadQuestion(); // 切換難度後立即刷新出題
+}
+
+function pickNextQuestion() {
+  roundCounter++;
+
+  // 1. 優先規則：檢查是否有「待複習錯題」，且達到每 2 回合出題間隔！
+  if (pendingReviewQIds.length > 0 && (roundCounter % REVIEW_INTERVAL === 0)) {
+    const wrongQId = pendingReviewQIds.shift(); // 取出最早錯的題
+    const foundWrongQ = questions.find(q => String(q.id) === String(wrongQId));
+    if (foundWrongQ && (qMasteryStats[foundWrongQ.id] || 0) < MAX_CORRECT_PER_Q) {
+      return { qData: foundWrongQ, isReview: true };
     }
-  } catch (e) {
-    box.innerHTML = `<div style="color:#888; font-size:0.75rem; text-align:center;">更新榜單中...</div>`;
+  }
+
+  // 2. 篩選符合條件的題目池：
+  // 條件 A：題目難度 >= 學生自選門檻（例如選非常難(4)，只出4、5級）
+  // 條件 B：該題目答對次數 < 5 次（答對滿5次自動淘汰防刷分）
+  let pool = questions.filter(q => {
+    const meetDiff = Number(q.difficulty) >= selectedMinDiff;
+    const notMastered = (qMasteryStats[q.id] || 0) < MAX_CORRECT_PER_Q;
+    return meetDiff && notMastered;
+  });
+
+  // 若該難度題目全部都被答對5次精通了
+  if (pool.length === 0) {
+    return null;
+  }
+
+  const randomQ = pool[Math.floor(Math.random() * pool.length)];
+  return { qData: randomQ, isReview: false };
+}
+
+function openQuiz() {
+  document.getElementById("quiz-modal").style.display = "flex";
+  loadQuestion();
+}
+
+function loadQuestion() {
+  if (questions.length === 0) {
+    alert("題庫為空，請老師至後台新增題目！"); return;
+  }
+
+  const result = pickNextQuestion();
+  if (!result) {
+    alert(`🎉 恭喜！目前難度門檻【${selectedMinDiff}級以上】的所有題目，您皆已答對滿 5 次通關！\n請切換其他難度或挑戰更高等級！`);
+    return;
+  }
+
+  currentQuestion = result.qData;
+  const qData = currentQuestion;
+
+  const diff = diffConfigs[qData.difficulty] || diffConfigs[2];
+  const badge = document.getElementById("q-diff-badge");
+  badge.innerText = diff.name;
+  badge.className = `diff-badge ${diff.class}`;
+
+  // 提示學生目前這題掌握度
+  const curMastery = qMasteryStats[qData.id] || 0;
+  const hintEl = document.getElementById("q-mastery-hint");
+  if (result.isReview) {
+    hintEl.innerHTML = `<b style="color:#ff5252;">⚠️ [錯題重點複習]</b> 已答對: ${curMastery}/5次`;
+  } else {
+    hintEl.innerText = `已答對: ${curMastery}/5次 (滿5次淘汰)`;
+  }
+
+  document.getElementById("q-title").innerText = `Q: ${qData.q}`;
+  const imgEl = document.getElementById("q-image");
+  if (qData.img) { imgEl.src = qData.img; imgEl.style.display = "block"; }
+  else { imgEl.style.display = "none"; }
+
+  document.getElementById("feedback").innerText = "";
+  document.getElementById("after-answer-btn").style.display = "none";
+
+  const optContainer = document.getElementById("options-container");
+  const typeContainer = document.getElementById("typing-container");
+
+  if (qData.type === "text") {
+    optContainer.style.display = "none";
+    typeContainer.style.display = "block";
+    const input = document.getElementById("type-answer-input");
+    input.value = "";
+    input.disabled = false;
+    document.getElementById("type-submit-btn").disabled = false;
+    setTimeout(() => input.focus(), 300);
+  } else {
+    typeContainer.style.display = "none";
+    optContainer.style.display = "block";
+    optContainer.innerHTML = "";
+
+    qData.options.forEach((opt, index) => {
+      const btn = document.createElement("button");
+      btn.className = "option-btn";
+      btn.innerText = `${index + 1}. ${opt}`;
+      btn.onclick = () => checkChoiceAnswer(index + 1);
+      optContainer.appendChild(btn);
+    });
   }
 }
 
-/* ==================== 4. 教師管理後台（含刪除學生與Excel匯入） ==================== */
+document.getElementById("type-answer-input").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") checkTypeAnswer();
+});
+
+function checkChoiceAnswer(chosenNum) {
+  const qData = currentQuestion;
+  document.querySelectorAll("#options-container .option-btn").forEach(b => b.disabled = true);
+  const isRight = (String(chosenNum) === String(qData.ans));
+  processAnswerResult(isRight, `選項 ${qData.ans}. ${qData.options[Number(qData.ans) - 1]}`);
+}
+
+function checkTypeAnswer() {
+  const qData = currentQuestion;
+  const userText = document.getElementById("type-answer-input").value.trim().toLowerCase();
+  if (!userText) { alert("請先輸入答案！"); return; }
+
+  document.getElementById("type-answer-input").disabled = true;
+  document.getElementById("type-submit-btn").disabled = true;
+
+  const acceptedAnswers = qData.ans.split(",").map(a => a.trim().toLowerCase()).filter(Boolean);
+  const isRight = acceptedAnswers.includes(userText);
+  processAnswerResult(isRight, qData.ans);
+}
+
+function processAnswerResult(isRight, correctAnswerText) {
+  const qData = currentQuestion;
+  const feedback = document.getElementById("feedback");
+  const nextBtn = document.getElementById("after-answer-btn");
+  const diff = diffConfigs[qData.difficulty] || diffConfigs[2];
+
+  if (isRight) {
+    correctCount++;
+    answeredCorrectly = true;
+    totalScore += diff.score;
+    updateScoreUI();
+    showFloatingScore(diff.score, `難度加分`);
+
+    // 累計該題答對次數
+    qMasteryStats[qData.id] = (qMasteryStats[qData.id] || 0) + 1;
+    const curMastery = qMasteryStats[qData.id];
+
+    let retirementMsg = "";
+    if (curMastery >= MAX_CORRECT_PER_Q) {
+      retirementMsg = " 🎓 [此題已完全精通(滿5次)，將不再重複出現！]";
+    }
+
+    feedback.style.color = "#4caf50";
+    feedback.innerText = `🎉 答對了！獲得【+${diff.score}分】並取得隨機方塊！${retirementMsg}`;
+    nextBtn.innerText = "開始放置方塊 ➡️";
+  } else {
+    answeredCorrectly = false;
+    const qShort = qData.q.length > 6 ? qData.q.substring(0, 6) + "..." : qData.q;
+    const wrongInfo = `第${qData.id}題(${qShort})`;
+    if (!wrongQuestions.includes(wrongInfo)) wrongQuestions.push(wrongInfo);
+
+    // 【錯題排入待複習佇列】
+    if (!pendingReviewQIds.includes(qData.id)) {
+      pendingReviewQIds.push(qData.id);
+    }
+
+    feedback.style.color = "#f44336";
+    if (qData.showAnswer) {
+      feedback.innerText = `❌ 答錯了！正確答案是：【${correctAnswerText}】。\n解析：${qData.explanation}\n(💡 此題稍後將再次重現複習！)`;
+    } else {
+      feedback.innerText = "❌ 答錯了！此題為思考題不公開答案，稍後將再次重現！";
+    }
+    nextBtn.innerText = "下一題 ➡️";
+  }
+
+  nextBtn.style.display = "block";
+  autoSaveToCloud();
+}
+
+function handleAfterAnswer() {
+  document.getElementById("quiz-modal").style.display = "none";
+  if (answeredCorrectly) {
+    playerReset();
+    gamePaused = false;
+  } else {
+    openQuiz();
+  }
+}
+
+function showTurnOptions() {
+  document.getElementById("turn-score").innerText = totalScore;
+  const turnModal = document.getElementById("turn-modal");
+  const saveBtn = document.getElementById("turn-save-btn");
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.style.opacity = "0.6";
+    setTimeout(() => {
+      saveBtn.disabled = false;
+      saveBtn.style.opacity = "1";
+    }, 500);
+  }
+  turnModal.style.display = "flex";
+}
+
+function continueToNextQuiz() {
+  document.getElementById("turn-modal").style.display = "none";
+  openQuiz();
+}
+
+function saveAndExit() {
+  autoSaveToCloud();
+  alert("進度已完整同步！");
+  location.reload();
+}
+
+/* ==================== 4. 教師管理後台（題庫線上檢視/改難度/刪除） ==================== */
 function openAdmin() {
   document.getElementById("admin-modal").style.display = "flex";
   fetchClassScores();
@@ -476,6 +701,7 @@ function closeAdmin() { document.getElementById("admin-modal").style.display = "
 function switchAdminTab(tab) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.getElementById("tab-scores").style.display = "none";
+  document.getElementById("tab-editQ").style.display = "none";
   document.getElementById("tab-importExcel").style.display = "none";
   document.getElementById("tab-addQ").style.display = "none";
 
@@ -483,12 +709,81 @@ function switchAdminTab(tab) {
     event.target.classList.add("active");
     document.getElementById("tab-scores").style.display = "block";
     fetchClassScores();
+  } else if (tab === "editQ") {
+    event.target.classList.add("active");
+    document.getElementById("tab-editQ").style.display = "block";
+    renderAdminQuestionsList();
   } else if (tab === "importExcel") {
     event.target.classList.add("active");
     document.getElementById("tab-importExcel").style.display = "block";
   } else {
     event.target.classList.add("active");
     document.getElementById("tab-addQ").style.display = "block";
+  }
+}
+
+// 線上題庫清單渲染與直接修改難度
+async function renderAdminQuestionsList() {
+  const tbody = document.getElementById("admin-q-tbody");
+  tbody.innerHTML = `<tr><td colspan="4">讀取雲端題庫中...</td></tr>`;
+  await loadQuestionsFromCloud();
+
+  if (questions.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4">目前雲端沒有任何題目</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = "";
+  questions.forEach(q => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><b>#${q.id}</b></td>
+      <td style="text-align:left; font-size:0.8rem;">${q.q}</td>
+      <td>
+        <select id="diff-sel-${q.id}" style="background:#222; color:#fff; border:1px solid #666; border-radius:4px; padding:3px; font-size:0.75rem;">
+          <option value="1" ${q.difficulty == 1 ? "selected" : ""}>🌱 簡單 (+1)</option>
+          <option value="2" ${q.difficulty == 2 ? "selected" : ""}>📘 普通 (+2)</option>
+          <option value="3" ${q.difficulty == 3 ? "selected" : ""}>⚡ 難 (+3)</option>
+          <option value="4" ${q.difficulty == 4 ? "selected" : ""}>🔥 非常難 (+4)</option>
+          <option value="5" ${q.difficulty == 5 ? "selected" : ""}>☠️ 地獄 (+5)</option>
+        </select>
+      </td>
+      <td>
+        <button class="save-mini-btn" onclick="saveQuestionDifficulty(${q.id})">💾 儲存難度</button>
+        <button class="del-btn" style="margin-left:4px;" onclick="deleteQuestionItem(${q.id})">🗑️</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// 儲存修改的難度
+async function saveQuestionDifficulty(qId) {
+  const newDiff = document.getElementById(`diff-sel-${qId}`).value;
+  try {
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "updateQuestionDifficulty", id: qId, difficulty: newDiff })
+    });
+    alert(`第 #${qId} 題難度已成功更新！全班立即同步！`);
+    await loadQuestionsFromCloud();
+  } catch (e) {
+    alert("更新難度失敗，請檢查網路連線！");
+  }
+}
+
+// 刪除特定題目
+async function deleteQuestionItem(qId) {
+  if (!confirm(`確定要刪除第 #${qId} 題嗎？\n此動作將同步從雲端試算表中移除！`)) return;
+  try {
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "deleteQuestion", id: qId })
+    });
+    alert(`已成功刪除第 #${qId} 題！`);
+    renderAdminQuestionsList();
+  } catch (e) {
+    alert("刪除題目失敗！");
   }
 }
 
@@ -542,25 +837,18 @@ async function fetchClassScores() {
   }
 }
 
-// 刪除指定學生
 async function deleteStudentRecord(email, name) {
-  if (!confirm(`確定要刪除「${name}」的紀錄嗎？\n此動作將同步從 Google 試算表中清除！`)) return;
-
-  try {
-    await fetch(GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "deleteStudent", email: email })
-    });
-    alert(`已成功刪除 ${name} 的紀錄！`);
-    fetchClassScores();
-    updateSideLeaderboard();
-  } catch (e) {
-    alert("刪除失敗，請檢查網路連線！");
-  }
+  if (!confirm(`確定要刪除「${name}」的紀錄嗎？`)) return;
+  await fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "deleteStudent", email: email })
+  });
+  alert(`已成功刪除 ${name} 的紀錄！`);
+  fetchClassScores();
+  updateSideLeaderboard();
 }
 
-/* ==================== 5. Excel 批次題庫處理 ==================== */
-// 下載標準 Excel 範本
+/* ==================== 5. Excel 匯入與單題新增 ==================== */
 function downloadExcelTemplate() {
   const templateData = [
     ["題目文字", "圖片網址(可留空)", "選項1", "選項2", "選項3", "選項4", "正確答案(選擇題填1-4/打字題填文字)", "是否公布解答(TRUE/FALSE)", "解析內容", "難度等級(1簡單-5地獄)", "題型(choice/text)"],
@@ -573,7 +861,6 @@ function downloadExcelTemplate() {
   XLSX.writeFile(wb, "俄羅斯方塊_標準題庫出題範本.xlsx");
 }
 
-// 讀取並上傳 Excel 檔案
 function processExcelUpload() {
   const fileInput = document.getElementById("excel-file-input");
   const statusEl = document.getElementById("import-status");
@@ -597,7 +884,6 @@ function processExcelUpload() {
       }
 
       const parsedQuestions = [];
-      // 從第 2 行 (索引 1) 開始讀取
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         if (r && r[0]) {
@@ -630,7 +916,6 @@ function processExcelUpload() {
         statusEl.innerText = "❌ 匯入失敗，請確認試算表狀態。";
       }
     } catch (err) {
-      console.error(err);
       statusEl.innerText = "❌ 檔案解析失敗，請確認格式為標準 .xlsx 範本！";
     }
   };
@@ -682,7 +967,37 @@ function startTeacherTest() {
   openQuiz();
 }
 
-/* ==================== 6. 答題邏輯 ==================== */
+/* ==================== 6. 排行榜與自動存檔 ==================== */
+async function updateSideLeaderboard() {
+  const box = document.getElementById("rank-list-box");
+  try {
+    const res = await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "getAllScores" })
+    });
+    const data = await res.json();
+    if (data.status === "success" && data.students.length > 0) {
+      data.students.sort((a,b) => b.score - a.score);
+      const topList = data.students.slice(0, 5);
+      let html = "";
+      const medals = ["🥇", "🥈", "🥉", "4.", "5."];
+      topList.forEach((st, idx) => {
+        html += `
+          <div class="rank-item">
+            <span>${medals[idx]} <span class="rank-name">${st.name}</span></span>
+            <b style="color:#ffeb3b;">${st.score}分</b>
+          </div>
+        `;
+      });
+      box.innerHTML = html;
+    } else {
+      box.innerHTML = `<div style="color:#aaa; font-size:0.75rem; text-align:center;">暫無排名</div>`;
+    }
+  } catch (e) {
+    box.innerHTML = `<div style="color:#888; font-size:0.75rem; text-align:center;">更新榜單中...</div>`;
+  }
+}
+
 function autoSaveToCloud() {
   const wrongText = wrongQuestions.length > 0 ? wrongQuestions.join("; ") : "無 (全對)";
   fetch(GOOGLE_SCRIPT_URL, {
@@ -695,156 +1010,7 @@ function autoSaveToCloud() {
   }).then(() => updateSideLeaderboard());
 }
 
-function openQuiz() {
-  document.getElementById("quiz-modal").style.display = "flex";
-  loadQuestion();
-}
-
-function loadQuestion() {
-  if (questions.length === 0) {
-    alert("題庫為空，請老師至後台新增題目！"); return;
-  }
-  if (currentQIndex >= questions.length) currentQIndex = Math.floor(Math.random() * questions.length);
-  const qData = questions[currentQIndex];
-
-  const diff = diffConfigs[qData.difficulty] || diffConfigs[2];
-  const badge = document.getElementById("q-diff-badge");
-  badge.innerText = diff.name;
-  badge.className = `diff-badge ${diff.class}`;
-
-  document.getElementById("q-title").innerText = `Q: ${qData.q}`;
-  const imgEl = document.getElementById("q-image");
-  if (qData.img) { imgEl.src = qData.img; imgEl.style.display = "block"; }
-  else { imgEl.style.display = "none"; }
-
-  document.getElementById("feedback").innerText = "";
-  document.getElementById("after-answer-btn").style.display = "none";
-
-  const optContainer = document.getElementById("options-container");
-  const typeContainer = document.getElementById("typing-container");
-
-  if (qData.type === "text") {
-    optContainer.style.display = "none";
-    typeContainer.style.display = "block";
-    const input = document.getElementById("type-answer-input");
-    input.value = "";
-    input.disabled = false;
-    document.getElementById("type-submit-btn").disabled = false;
-    setTimeout(() => input.focus(), 300);
-  } else {
-    typeContainer.style.display = "none";
-    optContainer.style.display = "block";
-    optContainer.innerHTML = "";
-
-    qData.options.forEach((opt, index) => {
-      const btn = document.createElement("button");
-      btn.className = "option-btn";
-      btn.innerText = `${index + 1}. ${opt}`;
-      btn.onclick = () => checkChoiceAnswer(index + 1);
-      optContainer.appendChild(btn);
-    });
-  }
-}
-
-document.getElementById("type-answer-input").addEventListener("keypress", function(e) {
-  if (e.key === "Enter") checkTypeAnswer();
-});
-
-function checkChoiceAnswer(chosenNum) {
-  const qData = questions[currentQIndex];
-  document.querySelectorAll("#options-container .option-btn").forEach(b => b.disabled = true);
-  const isRight = (String(chosenNum) === String(qData.ans));
-  processAnswerResult(isRight, `選項 ${qData.ans}. ${qData.options[Number(qData.ans) - 1]}`);
-}
-
-function checkTypeAnswer() {
-  const qData = questions[currentQIndex];
-  const userText = document.getElementById("type-answer-input").value.trim().toLowerCase();
-  if (!userText) { alert("請先輸入答案！"); return; }
-
-  document.getElementById("type-answer-input").disabled = true;
-  document.getElementById("type-submit-btn").disabled = true;
-
-  const acceptedAnswers = qData.ans.split(",").map(a => a.trim().toLowerCase()).filter(Boolean);
-  const isRight = acceptedAnswers.includes(userText);
-  processAnswerResult(isRight, qData.ans);
-}
-
-function processAnswerResult(isRight, correctAnswerText) {
-  const qData = questions[currentQIndex];
-  const feedback = document.getElementById("feedback");
-  const nextBtn = document.getElementById("after-answer-btn");
-  const diff = diffConfigs[qData.difficulty] || diffConfigs[2];
-
-  if (isRight) {
-    correctCount++;
-    answeredCorrectly = true;
-    totalScore += diff.score;
-    updateScoreUI();
-    showFloatingScore(diff.score, `難度加分`);
-
-    feedback.style.color = "#4caf50";
-    feedback.innerText = `🎉 答對了！獲得【+${diff.score}分】並取得隨機方塊！`;
-    nextBtn.innerText = "開始放置方塊 ➡️";
-  } else {
-    answeredCorrectly = false;
-    const qShort = qData.q.length > 6 ? qData.q.substring(0, 6) + "..." : qData.q;
-    const wrongInfo = `第${qData.id || currentQIndex + 1}題(${qShort})`;
-    if (!wrongQuestions.includes(wrongInfo)) wrongQuestions.push(wrongInfo);
-
-    feedback.style.color = "#f44336";
-    if (qData.showAnswer) {
-      feedback.innerText = `❌ 答錯了！正確答案是：【${correctAnswerText}】。\n解析：${qData.explanation}`;
-    } else {
-      feedback.innerText = "❌ 答錯了！此題為思考題不公開答案，請再接再厲！";
-    }
-    nextBtn.innerText = "下一題 ➡️";
-  }
-
-  nextBtn.style.display = "block";
-  autoSaveToCloud();
-}
-
-function handleAfterAnswer() {
-  document.getElementById("quiz-modal").style.display = "none";
-  if (answeredCorrectly) {
-    playerReset();
-    gamePaused = false;
-  } else {
-    currentQIndex++;
-    openQuiz();
-  }
-}
-
-function showTurnOptions() {
-  document.getElementById("turn-score").innerText = totalScore;
-  const turnModal = document.getElementById("turn-modal");
-  const saveBtn = document.getElementById("turn-save-btn");
-
-  if (saveBtn) {
-    saveBtn.disabled = true;
-    saveBtn.style.opacity = "0.6";
-    setTimeout(() => {
-      saveBtn.disabled = false;
-      saveBtn.style.opacity = "1";
-    }, 500);
-  }
-  turnModal.style.display = "flex";
-}
-
-function continueToNextQuiz() {
-  document.getElementById("turn-modal").style.display = "none";
-  currentQIndex++;
-  openQuiz();
-}
-
-function saveAndExit() {
-  autoSaveToCloud();
-  alert("進度已完整同步！");
-  location.reload();
-}
-
-/* ==================== 7. 方塊核心引擎 ==================== */
+/* ==================== 7. 方塊核心引擎（無限累積機制） ==================== */
 const canvas = document.getElementById("tetris");
 const context = canvas.getContext("2d");
 context.scale(20, 20);
@@ -917,7 +1083,6 @@ function playerReset() {
     draw();
     autoSaveToCloud();
     gamePaused = true;
-    currentQIndex++;
     openQuiz();
     return;
   }
