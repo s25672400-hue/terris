@@ -13,7 +13,6 @@
   <style>
     * { box-sizing: border-box; touch-action: manipulation; -webkit-touch-callout: none; }
     
-    /* 舊機相容佈局：嚴格使用傳統相容技術，確保各機型完全一致 */
     html, body {
       width: 100%; height: 100%; height: 100vh; height: 100dvh;
       margin: 0; padding: 0; background: #121212; color: #fff;
@@ -22,7 +21,7 @@
       justify-content: space-between; align-items: center;
     }
 
-    /* 頂部資訊列 (固定高度，禁止擠壓) */
+    /* 頂部資訊列 */
     #top-bar {
       flex-shrink: 0; width: 100%; padding: 4px 8px;
       display: flex; flex-direction: column; align-items: center; z-index: 10;
@@ -33,14 +32,14 @@
       border-radius: 20px; font-size: 0.75rem; margin-top: 2px; cursor: pointer; font-weight: bold;
     }
 
-    /* 中間舞台：居中對齊，不隨意溢出 */
+    /* 中間主舞台 */
     #main-stage {
       flex: 1; width: 100%; display: flex; gap: 10px;
       justify-content: center; align-items: center; padding: 2px 8px;
       overflow: hidden; min-height: 0;
     }
 
-    /* 【關鍵修復】：左側欄寬度強制固定 95px，禁止縮小(flex-shrink:0)，絕不變竹竿！ */
+    /* 左側欄 (鎖定 95px 寬度) */
     #left-side-col {
       width: 95px; min-width: 95px; max-width: 95px;
       flex-shrink: 0 !important;
@@ -72,7 +71,17 @@
       padding: 4px; font-size: 0.7rem; width: 100%; cursor: pointer; font-weight: bold;
     }
 
-    /* 【關鍵修復】：棋盤比例穩固 (寬216px x 高360px，按12:20標準打造)，禁止失控放大！ */
+    /* 【新增】暫存方塊下方的「積分成就」按鈕 */
+    .reward-entry-btn {
+      background: linear-gradient(135deg, #ff8f00, #ff6f00);
+      color: #fff; border: 1.5px solid #ffb300; border-radius: 6px;
+      padding: 6px 2px; font-size: 0.72rem; width: 100%; cursor: pointer;
+      font-weight: bold; box-shadow: 0 2px 6px rgba(255,143,0,0.4);
+      display: flex; align-items: center; justify-content: center; gap: 3px;
+    }
+    .reward-entry-btn:active { transform: scale(0.96); }
+
+    /* 棋盤標準尺寸 */
     #game-container { 
       position: relative; border: 3px solid #555; background: #000;
       width: 216px; height: 360px; flex-shrink: 0 !important;
@@ -88,13 +97,12 @@
     }
     #float-score.show { transform: translate(-50%, -120%); opacity: 1; }
 
-    /* 【關鍵修復】：控制區禁止被壓縮(flex-shrink:0)，大小穩定舒適 */
+    /* 控制按鈕區 */
     #mobile-controls {
       flex-shrink: 0 !important; width: 100%; max-width: 350px;
       padding: 4px 12px calc(12px + env(safe-area-inset-bottom));
       display: flex; flex-direction: column;
     }
-    
     #dir-pad {
       display: grid; grid-template-columns: repeat(4, 1fr);
       gap: 10px; width: 100%;
@@ -107,7 +115,6 @@
     }
     .ctrl-btn:active { background: #444; transform: translateY(2px); box-shadow: 0 1px #111; }
     
-    /* 到底放置大間距拉開 24px */
     .drop-btn {
       height: 46px; width: 100%; background: #d32f2f; font-weight: bold; color: white;
       font-size: 1.1rem; margin-top: 24px; border-radius: 10px;
@@ -122,7 +129,7 @@
       justify-content: center; align-items: center; z-index: 100;
     }
     .modal-box {
-      background: #262626; padding: 20px; border-radius: 12px;
+      background: #262626; padding: 18px; border-radius: 12px;
       width: 92%; max-width: 520px; text-align: left; max-height: 85vh; overflow-y: auto;
     }
     .option-btn {
@@ -164,6 +171,44 @@
       background: #4caf50; color: white; border: none; border-radius: 4px;
       padding: 3px 6px; font-size: 0.75rem; cursor: pointer;
     }
+
+    /* ==================== 科技風成就表單專屬樣式 ==================== */
+    #reward-box {
+      border-radius: 14px; padding: 14px 12px; max-width: 440px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.8); transition: all 0.3s;
+    }
+    /* 五頁不同的主題外框發光色調 */
+    .reward-theme-1 { background: #051329; border: 2.5px solid #00e5ff; box-shadow: 0 0 15px rgba(0,229,255,0.3) !important; }
+    .reward-theme-2 { background: #052414; border: 2.5px solid #00e676; box-shadow: 0 0 15px rgba(0,230,118,0.3) !important; }
+    .reward-theme-3 { background: #261802; border: 2.5px solid #ffd600; box-shadow: 0 0 15px rgba(255,214,0,0.3) !important; }
+    .reward-theme-4 { background: #24050d; border: 2.5px solid #ff1744; box-shadow: 0 0 15px rgba(255,23,68,0.3) !important; }
+    .reward-theme-5 { background: #1c0529; border: 2.5px solid #e040fb; box-shadow: 0 0 15px rgba(224,64,251,0.3) !important; }
+
+    .reward-header {
+      text-align: center; font-size: 1.15rem; font-weight: bold;
+      letter-spacing: 1px; padding: 4px 10px; margin-bottom: 8px;
+      border-radius: 6px; display: inline-block; width: 100%;
+    }
+    .table-reward {
+      width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-bottom: 12px;
+    }
+    .table-reward tr { border-bottom: 1px solid rgba(255,255,255,0.12); }
+    .table-reward td { padding: 6px 4px; text-align: left; }
+    .score-target { font-weight: bold; color: #fff; width: 28%; white-space: nowrap; }
+    .reward-desc { width: 52%; line-height: 1.3; }
+    .reward-badge { width: 20%; text-align: right; font-weight: bold; white-space: nowrap; }
+    
+    .nav-btn-group {
+      display: flex; gap: 8px; justify-content: space-between; align-items: center;
+    }
+    .page-nav-btn {
+      padding: 9px 16px; border: none; border-radius: 6px; font-weight: bold;
+      font-size: 0.85rem; cursor: pointer; flex: 1; text-align: center; color: white;
+    }
+    .close-reward-btn {
+      padding: 9px 14px; background: #424242; color: #eee; border: 1px solid #666;
+      border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -174,9 +219,10 @@
     <div id="score-board">選手: <span id="display-name">-</span> | 累計總分: <span id="score">0</span></div>
   </div>
 
-  <!-- 2. 中間主舞台 (嚴格防變形) -->
+  <!-- 2. 中間主舞台 -->
   <div id="main-stage">
     <div id="left-side-col">
+      <!-- 風雲榜 -->
       <div id="side-leaderboard">
         <div style="font-weight:bold; color:#ffeb3b; border-bottom:1px solid #555; padding-bottom:2px; margin-bottom:3px; text-align:center;">
           🏆 班級風雲榜
@@ -184,11 +230,15 @@
         <div id="rank-list-box"><div style="color:#aaa; text-align:center;">載入中...</div></div>
       </div>
 
+      <!-- 暫存方塊箱 -->
       <div id="hold-box-container">
         <div style="font-size:0.68rem; color:#81d4fa; font-weight:bold;">📦 暫存方塊</div>
         <canvas id="hold-canvas" width="45" height="45"></canvas>
         <button class="hold-btn" onclick="handleHoldPiece()">暫存 / 換塊</button>
       </div>
+
+      <!-- 【新增】暫存方塊正下方的「積分成就」按鈕 -->
+      <button class="reward-entry-btn" onclick="openRewardModal()">🏆 積分成就</button>
     </div>
 
     <!-- 棋盤標準尺寸 -->
@@ -209,7 +259,27 @@
     <button class="drop-btn" onclick="requestHardDrop()">⚡ 到底放置</button>
   </div>
 
-  <!-- 彈窗群 -->
+  <!-- ==================== 【新增】五頁積分成就表單彈窗 ==================== -->
+  <div id="reward-modal" class="modal" style="display:none;">
+    <div class="modal-box" id="reward-box">
+      <!-- 頁面標題 -->
+      <div id="reward-page-title" class="reward-header">載入中...</div>
+
+      <!-- 成就表格內容 (自動根據總分比對解鎖狀態) -->
+      <table class="table-reward" id="reward-table">
+        <tbody id="reward-tbody"></tbody>
+      </table>
+
+      <!-- 底部按鈕控制區 (依第1~5頁動態切換 上一頁/下一頁/關閉) -->
+      <div class="nav-btn-group">
+        <button id="reward-prev-btn" class="page-nav-btn" style="background:#0288d1; display:none;" onclick="changeRewardPage(-1)">⬅️ 上一頁</button>
+        <button class="close-reward-btn" onclick="closeRewardModal()">關閉</button>
+        <button id="reward-next-btn" class="page-nav-btn" style="background:#00e5ff; color:#000; display:none;" onclick="changeRewardPage(1)">下一頁 ➡️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 登入與其他彈窗群 -->
   <div id="login-modal" class="modal">
     <div class="modal-box" style="text-align:center;">
       <h3>🎮 答題俄羅斯方塊</h3>
@@ -381,9 +451,9 @@
 
 <script>
 /* ==================== 1. 老師設定區 ==================== */
-const GOOGLE_CLIENT_ID = "479239925260-p9kvntbmlp23ginho02tou72ckg0n9f1.apps.googleusercontent.com";
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzWLVLbAAVd3rGVktP08gluiIqzSn4xSl-0QFRZF8wNcEqCN9d-MFeEX8YO3MIEFJOV/exec";
-const TEACHER_EMAIL = "s256724@gmail.com";
+const GOOGLE_CLIENT_ID = "您的_GOOGLE_CLIENT_ID_貼在這邊";
+const GOOGLE_SCRIPT_URL = "您的_GOOGLE_SCRIPT_網址_貼在這邊";
+const TEACHER_EMAIL = "teacher@gmail.com";
 
 document.getElementById("g_id_onload").setAttribute("data-client_id", GOOGLE_CLIENT_ID);
 
@@ -419,6 +489,153 @@ const diffConfigs = {
   5: { name: "☠️ 地獄 (+5分)", class: "diff-5", score: 5 }
 };
 
+/* ==================== 【新增】五頁成就獎勵資料設定 ==================== */
+let currentRewardPageIndex = 0;
+const rewardPagesData = [
+  {
+    title: "第一頁：入門挑戰",
+    themeClass: "reward-theme-1",
+    btnColor: "#00e5ff",
+    items: [
+      { score: 1000, desc: "獲得普通寶箱鑰匙一把", tag: "🧰 1000分" },
+      { score: 2000, desc: "獲得普通寶箱鑰匙兩把", tag: "🧰 1000分" },
+      { score: 3000, desc: "獲得中級寶箱鑰匙一把", tag: "📦 2000分" },
+      { score: 5000, desc: "獲得中級寶箱鑰匙兩把", tag: "📦 2000分" },
+      { score: 10000, desc: "獲得高級寶箱鑰匙一把", tag: "🎁 3000分" },
+      { score: 15000, desc: "獲得高級寶箱鑰匙兩把", tag: "🎁 3000分" }
+    ]
+  },
+  {
+    title: "第二頁：青銅與鐵銀",
+    themeClass: "reward-theme-2",
+    btnColor: "#00e676",
+    items: [
+      { score: 20000, desc: "獲得青銅寶箱鑰匙一把", tag: "🥉 5000分" },
+      { score: 26000, desc: "獲得青銅寶箱鑰匙兩把", tag: "🥉 5000分" },
+      { score: 35000, desc: "獲得青銅寶箱鑰匙三把", tag: "🥉 5000分" },
+      { score: 50000, desc: "獲得銀鐵寶箱鑰匙一把", tag: "🥈 15000分" },
+      { score: 75000, desc: "獲得銀鐵寶箱鑰匙兩把", tag: "🥈 15000分" },
+      { score: 100000, desc: "獲得銀鐵寶箱鑰匙三把", tag: "🥈 15000分" }
+    ]
+  },
+  {
+    title: "第三頁：黃金與寶石",
+    themeClass: "reward-theme-3",
+    btnColor: "#ffd600",
+    items: [
+      { score: 150000, desc: "獲得銀鐵寶箱鑰匙五把", tag: "🥈 15000分" },
+      { score: 200000, desc: "獲得黃金寶箱鑰匙一把", tag: "🥇 20000分" },
+      { score: 260000, desc: "獲得黃金寶箱鑰匙兩把", tag: "🥇 20000分" },
+      { score: 350000, desc: "獲得黃金寶箱鑰匙三把", tag: "🥇 20000分" },
+      { score: 500000, desc: "獲得黃金寶箱鑰匙五把", tag: "🥇 20000分" },
+      { score: 750000, desc: "獲得紅寶石寶箱鑰匙一把", tag: "💎 26000分" }
+    ]
+  },
+  {
+    title: "第四頁：紅綠紫晶",
+    themeClass: "reward-theme-4",
+    btnColor: "#ff1744",
+    items: [
+      { score: 1000000, desc: "獲得紅寶石寶箱鑰匙三把", tag: "💎 26000分" },
+      { score: 1500000, desc: "獲得紅寶石寶箱鑰匙五把", tag: "💎 26000分" },
+      { score: 2000000, desc: "獲得綠寶石寶箱鑰匙一把", tag: "🟢 35000分" },
+      { score: 2500000, desc: "獲得綠寶石寶箱鑰匙三把", tag: "🟢 35000分" },
+      { score: 3000000, desc: "獲得綠寶石寶箱鑰匙五把", tag: "🟢 35000分" },
+      { score: 3600000, desc: "獲得紫水晶寶箱鑰匙一把", tag: "🟣 50000分" }
+    ]
+  },
+  {
+    title: "第五頁：至尊傳奇",
+    themeClass: "reward-theme-5",
+    btnColor: "#e040fb",
+    items: [
+      { score: 4500000, desc: "獲得紫水晶寶箱鑰匙三把", tag: "🟣 50000分" },
+      { score: 5500000, desc: "獲得紫水晶寶箱鑰匙五把", tag: "🟣 50000分" },
+      { score: 7000000, desc: "獲得傳說寶箱鑰匙一把", tag: "👑 75000分" },
+      { score: 8000000, desc: "獲得傳說寶箱鑰匙三把", tag: "👑 75000分" },
+      { score: 9000000, desc: "獲得傳說寶箱鑰匙五把", tag: "👑 75000分" },
+      { score: 10000000, desc: "獲得至尊寶箱鑰匙一把", tag: "🌟 100000分" }
+    ]
+  }
+];
+
+function openRewardModal() {
+  currentRewardPageIndex = 0; // 預設打開第 1 頁
+  renderRewardPage(currentRewardPageIndex);
+  document.getElementById("reward-modal").style.display = "flex";
+}
+
+function closeRewardModal() {
+  document.getElementById("reward-modal").style.display = "none";
+}
+
+function changeRewardPage(delta) {
+  currentRewardPageIndex += delta;
+  if (currentRewardPageIndex < 0) currentRewardPageIndex = 0;
+  if (currentRewardPageIndex > 4) currentRewardPageIndex = 4;
+  renderRewardPage(currentRewardPageIndex);
+}
+
+function renderRewardPage(pageIdx) {
+  const pageData = rewardPagesData[pageIdx];
+  const box = document.getElementById("reward-box");
+  
+  // 清除舊主題並套用新主題邊框發光
+  box.className = "modal-box " + pageData.themeClass;
+
+  // 標題設定
+  const titleEl = document.getElementById("reward-page-title");
+  titleEl.innerText = pageData.title;
+  titleEl.style.color = pageData.btnColor;
+  titleEl.style.border = `1px solid ${pageData.btnColor}`;
+
+  // 渲染 6 筆成就，自動對比學生分數解鎖
+  const tbody = document.getElementById("reward-tbody");
+  tbody.innerHTML = "";
+
+  pageData.items.forEach(item => {
+    const isUnlocked = (totalScore >= item.score);
+    const tr = document.createElement("tr");
+    if (isUnlocked) {
+      tr.style.background = "rgba(255,255,255,0.08)";
+    }
+    tr.innerHTML = `
+      <td class="score-target" style="${isUnlocked ? 'color:#ffd600;' : 'color:#bbb;'}">
+        ${isUnlocked ? '✅ ' : '🔒 '}${item.score.toLocaleString()} 分
+      </td>
+      <td class="reward-desc" style="${isUnlocked ? 'color:#fff; font-weight:bold;' : 'color:#888;'}">
+        ${item.desc}
+      </td>
+      <td class="reward-badge" style="color:${pageData.btnColor}; font-size:0.7rem;">
+        ${item.tag}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // 控制按鈕顯示與隱藏（嚴格遵守第1~5頁要求）
+  const prevBtn = document.getElementById("reward-prev-btn");
+  const nextBtn = document.getElementById("reward-next-btn");
+
+  // 第1頁：只有下一頁
+  // 第2~4頁：上一頁與下一頁
+  // 第5頁：只有上一頁
+  if (pageIdx === 0) {
+    prevBtn.style.display = "none";
+    nextBtn.style.display = "block";
+  } else if (pageIdx === 4) {
+    prevBtn.style.display = "block";
+    nextBtn.style.display = "none";
+  } else {
+    prevBtn.style.display = "block";
+    nextBtn.style.display = "block";
+  }
+
+  nextBtn.style.background = pageData.btnColor;
+  nextBtn.style.color = (pageIdx === 2 || pageIdx === 0) ? "#000" : "#fff";
+}
+
+/* ==================== 3. Google 登入驗證 ==================== */
 function decodeJwt(token) {
   const base64Url = token.split('.')[1];
   const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -496,8 +713,6 @@ async function confirmStudentName() {
       if (data.wrongList && data.wrongList !== "無 (全對)") wrongQuestions = data.wrongList.split("; ");
       if (data.arena && data.arena.length > 0) arena = data.arena;
       if (data.qMastery) qMasteryStats = data.qMastery;
-      
-      // 【關鍵還原】：從雲端還原暫存方塊
       if (data.holdPiece) {
         holdPieceType = data.holdPiece;
         drawHoldCanvas();
@@ -522,7 +737,7 @@ async function loadQuestionsFromCloud() {
   if (data.status === "success") questions = data.questions;
 }
 
-/* ==================== 3. 暫存方塊機制 ==================== */
+/* ==================== 4. 暫存方塊機制 ==================== */
 const holdCanvas = document.getElementById("hold-canvas");
 const holdCtx = holdCanvas.getContext("2d");
 holdCtx.scale(11, 11);
@@ -566,7 +781,7 @@ function handleHoldPiece() {
     player.matrix = null;
     gamePaused = true;
     draw();
-    autoSaveToCloud(); // 立即同步暫存方塊到雲端！
+    autoSaveToCloud();
     alert("📦 已將方塊存入暫存箱！請回答下一題取得新方塊！");
     openQuiz();
   } else {
@@ -581,12 +796,12 @@ function handleHoldPiece() {
       drawHoldCanvas();
       hasUsedHoldThisRound = true;
       draw();
-      autoSaveToCloud(); // 替換後同步到雲端！
+      autoSaveToCloud();
     }
   }
 }
 
-/* ==================== 4. 到底放置防誤觸 ==================== */
+/* ==================== 5. 到底放置防誤觸 ==================== */
 function requestHardDrop() {
   if (gamePaused || !player.matrix) return;
   document.getElementById("drop-confirm-modal").style.display = "flex";
@@ -606,7 +821,7 @@ function executeHardDrop() {
   draw();
 }
 
-/* ==================== 5. 出題與作答 ==================== */
+/* ==================== 6. 出題與作答 ==================== */
 function onDifficultyFilterChange() {
   selectedMinDiff = Number(document.getElementById("user-diff-select").value);
   loadQuestion();
@@ -791,7 +1006,7 @@ function saveAndExit() {
   location.reload();
 }
 
-/* ==================== 6. 教師後台 ==================== */
+/* ==================== 7. 教師後台 ==================== */
 function openAdmin() {
   document.getElementById("admin-modal").style.display = "flex";
   fetchClassScores();
@@ -932,7 +1147,7 @@ async function deleteStudentRecord(email, name) {
   updateSideLeaderboard();
 }
 
-/* ==================== 7. Excel 批次處理 ==================== */
+/* ==================== 8. Excel 批次處理 ==================== */
 function downloadExcelTemplate() {
   const templateData = [
     ["題目文字", "圖片網址(可留空)", "選項1", "選項2", "選項3", "選項4", "正確答案(選擇題填1-4/打字題填文字)", "是否公布解答(TRUE/FALSE)", "解析內容", "難度等級(1簡單-5地獄)", "題型(choice/text)"],
@@ -1050,7 +1265,7 @@ function startTeacherTest() {
   openQuiz();
 }
 
-/* ==================== 8. 排行榜與自動存檔 ==================== */
+/* ==================== 9. 排行榜與自動存檔 ==================== */
 async function updateSideLeaderboard() {
   const box = document.getElementById("rank-list-box");
   try {
@@ -1090,12 +1305,12 @@ function autoSaveToCloud() {
       score: totalScore, correctCount: correctCount,
       wrongList: wrongText, arena: arena,
       qMastery: qMasteryStats,
-      holdPiece: holdPieceType || "" // 【同步暫存方塊】
+      holdPiece: holdPieceType || ""
     })
   }).then(() => updateSideLeaderboard());
 }
 
-/* ==================== 9. 方塊核心引擎 ==================== */
+/* ==================== 10. 方塊核心引擎 ==================== */
 const canvas = document.getElementById("tetris");
 const context = canvas.getContext("2d");
 context.scale(20, 20);
@@ -1291,7 +1506,7 @@ document.addEventListener('keydown', e => {
   else if (e.code === "Space") requestHardDrop();
 });
 
-/* ==================== 10. 手機長按控制器 ==================== */
+/* ==================== 11. 手機長按控制器 ==================== */
 function bindContinuousPress(buttonId, actionFn, initialDelay = 180, repeatInterval = 60) {
   const btn = document.getElementById(buttonId);
   if (!btn) return;
